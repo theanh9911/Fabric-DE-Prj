@@ -468,19 +468,19 @@ Source → Bronze (rows Copy = rows Bronze) · Bronze → Silver (`in = out + qu
 | Rủi ro | Giảm thiểu |
 |---|---|
 | Làm dở dang | lát cắt dọc orders trước; từng bước nhỏ |
-| Trial capacity giới hạn (đã gặp `TooManyRequestsForCapacity`) | 1 phiên Spark mỗi lúc; runner dùng chung session |
+| Trial capacity giới hạn (đã gặp `TooManyRequestsForCapacity`) | 1 phiên Spark mỗi lúc; runner dùng chung session; dừng session xong việc (core trả về chậm ~1–2 phút) |
 | Data thật ≠ mô tả đề | ghi nhận ở Q1, xử lý ở Silver |
 | Notebook Git sync / conflict | quy tắc §3 |
 | Runtime 2.0 (Spark 4.1, ANSI bật) | luôn `try_cast`, `try_to_timestamp` với dữ liệu bẩn |
 
 ### 17.2 Spike — kiểm ngay ở Bước 0 (quyết định cách làm)
 
-| # | Cần biết | Nếu không được |
-|---|---|---|
-| K1 | Spark 4.1 trên Fabric có **SQL function** (`CREATE TEMPORARY FUNCTION … RETURN <biểu thức>`) | đăng ký cùng tên bằng Python UDF trong `nb_common` (SQL gọi y hệt) |
-| K2 | `%%configure` default lakehouse theo **tên** chạy được, kể cả notebook con trong `runMultiple` | gắn lakehouse trong runner, notebook con kế thừa session |
-| K3 | Định dạng Git của cell `%%sql` | tạo 1 notebook mẫu trên UI → Commit → xem file |
-| K4 | Pipeline Lookup đọc `meta.*` của lakehouse; Copy đọc Fabric SQL DB | dùng notebook nhỏ thay Lookup |
+| # | Cần biết | Nếu không được | Kết quả (2026-10-06) |
+|---|---|---|---|
+| K1 | Spark 4.1 trên Fabric có **SQL function** (`CREATE TEMPORARY FUNCTION … RETURN <biểu thức>`) | đăng ký cùng tên bằng Python UDF trong `nb_common` (SQL gọi y hệt) | ✅ chạy được |
+| K2 | `%%configure` default lakehouse theo **tên** chạy được, kể cả notebook con trong `runMultiple` | gắn lakehouse trong runner, notebook con kế thừa session | ⚠️ chạy được ở **standard session**; **lỗi trong high-concurrency session** → tắt HC cho notebook; pipeline/runMultiple còn phải kiểm |
+| K3 | Định dạng Git của cell `%%sql` | tạo 1 notebook mẫu trên UI → Commit → xem file | ✅ cell magic lưu dạng `# MAGIC %%sql …`, metadata `"language": "sparksql"`; `%run` để nguyên dạng thô |
+| K4 | Pipeline Lookup đọc `meta.*` của lakehouse; Copy đọc Fabric SQL DB | dùng notebook nhỏ thay Lookup | ⏳ kiểm ở Bước 2 |
 
 ### 17.3 ADR
 
