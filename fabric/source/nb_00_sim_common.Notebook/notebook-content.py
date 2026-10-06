@@ -27,7 +27,9 @@
 
 import datetime as dt
 import uuid
+from functools import lru_cache
 
+import sempy.fabric as fabric
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
@@ -35,9 +37,8 @@ from pyspark.sql import functions as F
 spark.conf.set("spark.sql.legacy.timeParserPolicy", "CORRECTED")
 
 SIM_CONFIG = {
-    # Lấy từ sqldb_erp_wholesale → Settings → Connection strings → JDBC
-    "erp_server": "<server>.database.fabric.microsoft.com",
-    "erp_database": "<database-name>",
+    # Chỉ khai báo TÊN item; server/database được tra ở runtime qua Fabric REST API (không lưu trong Git)
+    "erp_item": "sqldb_erp_wholesale",
     "sim_lakehouse": "lh_sim",
     "drop_lakehouse": "lh_retail_drop",
 }
@@ -192,9 +193,23 @@ def split_erp_rejects(entity: str, df: DataFrame):
 
 # CELL ********************
 
+@lru_cache(maxsize=1)
+def _erp_connection() -> tuple:
+    """Tra (server, database) của SQL DB theo tên item trong workspace hiện tại."""
+    client = fabric.FabricRestClient()
+    items = client.get(f"v1/workspaces/{_WORKSPACE_ID}/sqlDatabases").json()["value"]
+    item = next((i for i in items if i["displayName"] == SIM_CONFIG["erp_item"]), None)
+    if item is None:
+        raise ValueError(f"SQL database '{SIM_CONFIG['erp_item']}' not found in this workspace")
+    props = client.get(f"v1/workspaces/{_WORKSPACE_ID}/sqlDatabases/{item['id']}").json()["properties"]
+    server = props["serverFqdn"].split(",")[0]   # có thể kèm ",1433"
+    return server, props["databaseName"]
+
+
 def _erp_jdbc_url() -> str:
+    server, database = _erp_connection()
     return (
-        f"jdbc:sqlserver://{SIM_CONFIG['erp_server']}:1433;database={SIM_CONFIG['erp_database']};"
+        f"jdbc:sqlserver://{server}:1433;database={database};"
         "encrypt=true;trustServerCertificate=false;loginTimeout=30"
     )
 
