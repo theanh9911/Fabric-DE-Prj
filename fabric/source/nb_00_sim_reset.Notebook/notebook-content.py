@@ -46,12 +46,11 @@ if p_confirm != "RESET":
     notebookutils.notebook.exit("SKIPPED: set p_confirm = 'RESET' to run")
 
 # Orders trước (bảng con), master sau
-erp_exec("; ".join(f"DELETE FROM dbo.[{e}]" for e in reversed(list(ENTITIES))) + ";")
+erp_exec("; ".join(f"DELETE FROM dbo.[{e}]" for e in reversed(erp_entities())) + ";")
 
-for entity in ENTITIES:
-    folder = inbound_dir(entity)
-    if notebookutils.fs.exists(folder):
-        notebookutils.fs.rm(folder, True)
+# Toàn bộ drop zone của các nguồn file
+if notebookutils.fs.exists(inbound_dir()):
+    notebookutils.fs.rm(inbound_dir(), True)
 
 for table in ["sim_state", "sim_release_log", "sim_reject_log"]:
     path = sim_table(table)

@@ -47,12 +47,19 @@ SIM_CONFIG = {
     "future_date_cutoff": "2026-12-31",
 }
 
+# Mỗi nguồn là 1 hệ thống: "erp" → ghi vào SQL DB (có PK/NOT NULL); "file" → thả CSV nguyên trạng vào drop zone
+SOURCES = {
+    "wholesale": "erp",
+    "retail": "file",
+    "reference": "file",   # file tham chiếu dùng chung (categories.csv không thuộc ERP theo đề)
+}
+
 # Thứ tự khai báo = thứ tự release (master trước, orders sau)
 ENTITIES = {
     "categories": {
         "kind": "master",
         "pk": ["category_code"],
-        "sources": {"wholesale": "categories.csv"},
+        "sources": {"reference": "categories.csv"},
     },
     "customers": {
         "kind": "master",
@@ -125,8 +132,15 @@ def seed_file(file_name: str) -> str:
     return lakehouse_path(SIM_CONFIG["sim_lakehouse"], f"Files/seed/{file_name}")
 
 
-def inbound_dir(entity: str) -> str:
-    return lakehouse_path(SIM_CONFIG["drop_lakehouse"], f"Files/inbound/{entity}")
+def inbound_dir(source: str = "", entity: str = "") -> str:
+    """Drop zone của nguồn file: Files/inbound/<source>/<entity>/ (bỏ trống → thư mục cha)."""
+    sub_path = "/".join(p for p in ["Files/inbound", source, entity] if p)
+    return lakehouse_path(SIM_CONFIG["drop_lakehouse"], sub_path)
+
+
+def erp_entities() -> list:
+    """Entity có ít nhất 1 nguồn kiểu erp — tức có bảng dbo.<entity> trong SQL DB."""
+    return [e for e, spec in ENTITIES.items() if any(SOURCES[s] == "erp" for s in spec["sources"])]
 
 
 def table_exists(path: str) -> bool:

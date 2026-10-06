@@ -83,7 +83,7 @@
 ```
 ┌──────────────────── CompanyA-Source (giả lập hệ thống của team khác) ───────────────────┐
 │  sqldb_erp_wholesale  (Fabric SQL Database)      lh_retail_drop  (Lakehouse, Files only) │
-│   dbo.orders / customers / products /             Files/inbound/<entity>/                │
+│   dbo.orders / customers / products /             Files/inbound/<source>/<entity>/       │
 │   sales_hierarchy — PK/FK, UTC, index updated_at      <entity>_YYYYMMDD[_vN].csv         │
 │                         ▲                                    ▲                           │
 │                         └──────── nb_00_sim_* (05:00) ───────┘                           │
@@ -394,10 +394,20 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 | Item | Thiết kế |
 |---|---|
 | `sqldb_erp_wholesale` | Fabric SQL Database, mô hình **hybrid** (ADR 008): ép `datetime2` UTC, PK, NOT NULL trên key; giữ nguyên giá trị bẩn (status, tax_rate, tên…); FK **khai báo nhưng NOCHECK**. `orders` có `order_line_id` IDENTITY làm PK (append theo status) + **index `updated_at`**. Schema `sim.stg_*` = staging nội bộ simulator. DDL: SQL project `fabric/source/sqldb_erp_wholesale.SQLDatabase/` (Git sync) là nguồn sự thật — thay đổi schema sửa trên DB rồi Commit. |
-| `lh_retail_drop` | chỉ `Files/inbound/<entity>/` — CSV giữ nguyên byte dữ liệu gốc (free-form). |
+| `lh_retail_drop` | drop zone của các nguồn file: `Files/inbound/<source>/<entity>/` — CSV giữ nguyên byte dữ liệu gốc (free-form). |
 | `lh_sim` | nội bộ simulator: `Files/seed/` (9 CSV đề bài), `seed_<src>_<entity>`, `sim_state`, `sim_release_log`, `sim_reject_log`. Platform **không** đọc. |
 
+**Nguồn** (`SOURCES` trong `nb_00_sim_common`):
+
+| Source | Kiểu | Entity | Đích |
+|---|---|---|---|
+| `wholesale` | `erp` | customers, products, sales_hierarchy, orders | `sqldb_erp_wholesale.dbo.*` |
+| `retail` | `file` | customers, products, sales_hierarchy, orders | `inbound/retail/<entity>/` |
+| `reference` | `file` | categories | `inbound/reference/categories/` |
+
 > **Vì sao hybrid:** đề mô tả wholesale "schema-enforced, FK enforced" nhưng data mẫu wholesale bẩn như retail (orphan `CUS099`/`PRD999`, status sai chính tả, qty âm, tax `five percent`, `CAT010` không tồn tại…). Enforce thật → lỗi bị chặn ở nguồn, platform không còn gì để xử lý/demo Q1/Q5.
+>
+> **Vì sao `categories` là file `reference`, không thuộc ERP:** đề chỉ liệt kê bảng ERP là orders, customers, products, sales_hierarchy; file `categories.csv` không có hậu tố nguồn → file tham chiếu dùng chung. Đặt trong ERP thì PK chặn mất dòng trùng `CAT005` (2 phiên bản: `electronics/All-in-One` vs `Electronics/AllInOne`) — đó là issue Q1 mà Platform phải tự phát hiện (DQ `unique`) và xử lý bằng survivorship ở Silver. Với data seed hiện tại, ERP không từ chối dòng nào; cơ chế reject giữ cho generate/drill.
 
 ### 7.2 Timeline
 
@@ -417,7 +427,7 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 |---|---|---|
 | `nb_00_sim_common` | config + hàm dùng chung (`%run`) | ✅ draft |
 | `nb_00_sim_setup` | seed CSV → `seed_*` + `_release_date` | ✅ draft |
-| `nb_00_sim_daily(p_sim_date)` | release cửa sổ `(released_until, p_sim_date]`: wholesale MERGE / xoá-chèn theo cửa sổ (1 transaction), retail ghi file; vi phạm NOT NULL/PK → `sim_reject_log`; tự bù ngày lỡ; chạy lại không nhân đôi | ✅ draft |
+| `nb_00_sim_daily(p_days, p_sim_date)` | virtual clock: release cửa sổ `(released_until, released_until + p_days]`; nguồn `erp` → MERGE / xoá-chèn theo cửa sổ (1 transaction), vi phạm NOT NULL/PK → `sim_reject_log`; nguồn `file` → CSV nguyên trạng; chạy lại không nhân đôi; exit value = ngày giả lập | ✅ chạy được (initial load 2026-10-06) |
 | `nb_00_sim_reset` | xoá dữ liệu Source để replay từ đầu (`p_confirm = "RESET"`) | ✅ draft |
 | `nb_00_sim_master_change(p_sim_date)` | đổi master tại chỗ: địa chỉ khách, sản phẩm mới, **org chart** (promote/đổi manager/nghỉ) — không giữ lịch sử (đúng Q11) | P10 |
 | `nb_00_sim_late_orders` · `nb_00_sim_schema_v2` | drill Q14 · Q16 | P10 |
@@ -456,7 +466,7 @@ pl_ingest(p_load_date, p_run_id)
       db   → Copy: SELECT … WHERE updated_at >  wm − lookback
                               AND updated_at <= run_start
               → landing/wholesale/<entity>/load_date=<d>/batch=<id>/*.parquet
-      file → Copy (binary): inbound/<entity>/*  filter LastModified (wm, run_start]
+      file → Copy (binary): inbound/<source>/<entity>/*  filter LastModified (wm, run_start]
               → landing/retail/<entity>/load_date=<d>/batch=<id>/
     ghi kết quả copy (rows/files, batch_id) vào biến mảng
   nb_brz_load(batches = [...])                        ← 1 notebook, runMultiple
@@ -900,7 +910,7 @@ P0  P1  P2  P3  P4  P5  P6  P7  P8  P9  P10 P11 P12
 | R7 | CDF hết hạn khi dừng lâu | fallback tự động sang rebuild partition + alert |
 | R8 | Framework quá phức tạp so với lợi ích | P15: chỉ trừu tượng hoá khi có ≥ 2 nơi dùng; kiểm chứng bằng S3 |
 | R9 | Cập nhật wheel vào Environment mất thời gian | gom thay đổi package theo đợt; version rõ ràng |
-| R10 | Một số tính năng Fabric (liquid clustering, resource profile, SQL Database) khác nhau theo runtime/trial | kiểm tra ở P0; có phương án thay thế (partition + Z-order; Warehouse) |
+| R10 | Một số tính năng Fabric (liquid clustering, resource profile, SQL Database) khác nhau theo runtime/trial | Đã xác nhận: workspace chạy **Runtime 2.0 (Spark 4.1, Delta 4.2, Python 3.13)**, SQL Database dùng được. Spark 4 bật **ANSI mặc định** → luôn dùng `try_cast` / `try_to_timestamp` khi parse dữ liệu bẩn |
 
 ### 20.2 ADR dự kiến
 
@@ -913,4 +923,5 @@ P0  P1  P2  P3  P4  P5  P6  P7  P8  P9  P10 P11 P12
 | 005 | Config as code (YAML trong package) vs bảng sửa tay |
 | 006 | Partition vs liquid clustering cho orders |
 | 007 | Git sync theo workspace vs `fabric-cicd` |
-| 008 | ERP giả lập "hybrid" (ép timestamp/PK, giữ giá trị bẩn, FK NOCHECK) vs strict vs raw |
+| 008 | ERP giả lập "hybrid" (ép timestamp/PK, giữ giá trị bẩn, FK NOCHECK) vs strict vs raw; `categories` là file `reference` |
+| 009 | Virtual clock cho simulator (initial load tới 2025-12-31, replay theo ngày giả lập) vs đồng hồ thật |

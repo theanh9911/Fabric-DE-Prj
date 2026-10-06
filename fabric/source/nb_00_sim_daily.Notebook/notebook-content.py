@@ -15,9 +15,9 @@
 # - **Mục đích:** "hệ thống nguồn" phát sinh dữ liệu theo **virtual clock** — release mọi dòng seed có
 #   `_release_date` trong cửa sổ `(released_until, released_until + p_days]`.
 # - **Virtual clock:** ngày giả lập lưu trong `lh_sim.sim_state`, độc lập với ngày thật. Data giữ nguyên ngày gốc.
-# - **Wholesale → `sqldb_erp_wholesale`:** master MERGE, orders xoá-rồi-chèn theo cửa sổ `updated_at`.
+# - **Nguồn `erp` (wholesale) → `sqldb_erp_wholesale`:** master MERGE, orders xoá-rồi-chèn theo cửa sổ `updated_at`.
 #   Dòng vi phạm NOT NULL / PK bị "DB từ chối" → `lh_sim.sim_reject_log`.
-# - **Retail → `lh_retail_drop/Files/inbound/<entity>/`:**
+# - **Nguồn `file` (retail, reference) → `lh_retail_drop/Files/inbound/<source>/<entity>/`** — giữ nguyên dữ liệu gốc:
 #   orders 1 file/ngày (`orders_YYYYMMDD.csv`), cửa sổ dài (initial load) → 1 file `orders_history_until_YYYYMMDD.csv`;
 #   master có thay đổi → file snapshot `<entity>_YYYYMMDD.csv`.
 # - **Lần chạy đầu** = initial load toàn bộ lịch sử tới `SIM_CONFIG.initial_until` (kèm dòng ngày sai/không parse được).
@@ -80,7 +80,7 @@ print(f"{sim_run_id}: release window [{window_from} → {window_to}]")
 
 # CELL ********************
 
-def release_wholesale(entity: str, batch: DataFrame):
+def release_to_erp(entity: str, batch: DataFrame):
     """Ghi batch vào ERP. Trả về (rows_released, rejected_df, target)."""
     spec = ENTITIES[entity]
     ok, rejected = split_erp_rejects(entity, to_erp_typed(batch))
@@ -101,9 +101,9 @@ def release_wholesale(entity: str, batch: DataFrame):
     return n_ok, rejected, f"sqldb_erp_wholesale.dbo.{entity}"
 
 
-def release_retail(entity: str, seed: DataFrame, batch: DataFrame):
+def release_to_file(source: str, entity: str, seed: DataFrame, batch: DataFrame):
     """Thả file CSV vào inbound, giữ nguyên dữ liệu gốc. Trả về (rows_released, None, target)."""
-    folder = inbound_dir(entity)
+    folder = inbound_dir(source, entity)
 
     if ENTITIES[entity]["kind"] == "master":
         if batch.isEmpty():
@@ -139,10 +139,10 @@ for entity, spec in ENTITIES.items():
         seed = spark.read.format("delta").load(sim_table(f"seed_{source}_{entity}"))
         batch = seed.filter(F.col("_release_date").between(F.lit(window_from), F.lit(window_to)))
 
-        if source == "wholesale":
-            n_rows, rejected, target = release_wholesale(entity, batch)
+        if SOURCES[source] == "erp":
+            n_rows, rejected, target = release_to_erp(entity, batch)
         else:
-            n_rows, rejected, target = release_retail(entity, seed, batch)
+            n_rows, rejected, target = release_to_file(source, entity, seed, batch)
 
         n_rejected = 0
         if rejected is not None:
