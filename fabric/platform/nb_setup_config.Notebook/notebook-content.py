@@ -11,7 +11,7 @@
 
 # CELL ********************
 
-# MAGIC %%configure
+# MAGIC %%configure -f
 # MAGIC { "defaultLakehouse": { "name": "lh_platform" } }
 
 

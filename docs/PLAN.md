@@ -159,7 +159,7 @@ Fabric-DE-Prj/
 ### 4.3 Khung 1 notebook nghiệp vụ (Silver/Gold)
 
 ```
-Cell 0  %%configure  → default lakehouse = lh_platform (theo tên)
+Cell 0  %%configure -f  → default lakehouse = lh_platform (theo tên); -f vì session có thể đã chạy sẵn
 Cell 1  (markdown)   Mục đích · Input · Output · Grain · Cách load
 Cell 2  (parameters) p_load_date, p_run_id, p_full_reload
 Cell 3  %run nb_common              → đăng ký SQL function, set biến SQL
