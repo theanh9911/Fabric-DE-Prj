@@ -1,8 +1,8 @@
 # Plan — Fabric DE Project (Company A Sales)
 
 > Mô phỏng 1 dự án Data Engineering thật trên Microsoft Fabric, dựa trên đề *Data Engineer Case Study*.
-> Làm việc trên **Fabric UI** + **Git (GitHub)**. Local dùng cho package Python, test, review.
-> Trạng thái: **PLANNING** · Cập nhật: 2026-10-06
+> Làm việc trên **Fabric web UI** + **Git (GitHub)**. Hướng **SQL-first**: biến đổi dữ liệu bằng Spark SQL; Python chỉ là "keo dán".
+> Trạng thái: **Source ✅ xong · Platform: bắt đầu** · Cập nhật: 2026-10-06
 
 ---
 
@@ -11,267 +11,172 @@
 0. [Mục tiêu & phạm vi](#0-mục-tiêu--phạm-vi)
 1. [Nguyên tắc cốt lõi](#1-nguyên-tắc-cốt-lõi)
 2. [Kiến trúc tổng thể](#2-kiến-trúc-tổng-thể)
-3. [Môi trường, Git & CI/CD](#3-môi-trường-git--cicd)
-4. [Engineering standards](#4-engineering-standards)
+3. [Môi trường & Git](#3-môi-trường--git)
+4. [Cách viết code: SQL-first](#4-cách-viết-code-sql-first)
 5. [Conventions](#5-conventions)
-6. [Config, reference data & state](#6-config-reference-data--state)
-7. [Source simulator](#7-source-simulator)
+6. [Bảng meta: config, ref, state, log](#6-bảng-meta-config-ref-state-log)
+7. [Source (đã xong)](#7-source-đã-xong)
 8. [Ingest & Bronze](#8-ingest--bronze)
 9. [Silver](#9-silver)
 10. [Gold](#10-gold)
-11. [Log & observability](#11-log--observability)
-12. [Data quality & reconciliation](#12-data-quality--reconciliation)
-13. [Orchestration](#13-orchestration)
-14. [Semantic model & report](#14-semantic-model--report)
-15. [Performance & scale playbook](#15-performance--scale-playbook)
-16. [Vận hành, bảo trì & phục hồi](#16-vận-hành-bảo-trì--phục-hồi)
-17. [Scenario drills](#17-scenario-drills)
-18. [Roadmap](#18-roadmap)
-19. [Mapping câu hỏi → phần](#19-mapping-câu-hỏi--phần)
-20. [Rủi ro & ADR](#20-rủi-ro--adr)
+11. [Orchestration, log, DQ, recon](#11-orchestration-log-dq-recon)
+12. [Semantic model & report](#12-semantic-model--report)
+13. [Performance & vận hành](#13-performance--vận-hành)
+14. [Scenario drills](#14-scenario-drills)
+15. [Roadmap từng bước](#15-roadmap-từng-bước)
+16. [Mapping câu hỏi → phần](#16-mapping-câu-hỏi--phần)
+17. [Rủi ro, spike cần kiểm chứng & ADR](#17-rủi-ro-spike-cần-kiểm-chứng--adr)
 
 ---
 
 ## 0. Mục tiêu & phạm vi
 
-**Mục tiêu**
-1. Trả lời đầy đủ Part I (Q1–Q17), Part II (Q18–Q22) nếu còn thời gian — mỗi câu có **bằng chứng chạy thật**.
-2. Xây 1 data platform chạy **mỗi ngày với data mới**, thiết kế như thể ở **quy mô lớn** (orders hàng tỷ dòng).
-3. Thể hiện chuẩn làm việc của một team DE: Git, config-driven, test, DQ, observability, runbook.
-
-**Ngoài phạm vi:** streaming real-time, ML, Purview/governance đầy đủ, multi-tenant.
+1. Trả lời Part I (Q1–Q17) — mỗi câu có **bằng chứng chạy thật**; Part II (Q18–Q22) nếu còn thời gian.
+2. Platform chạy **mỗi ngày với data mới** (virtual clock), thiết kế như ở **quy mô lớn**.
+3. **Đơn giản, ai biết SQL cũng đọc/sửa được.** Không dựng hạ tầng thừa (không wheel, không Docker, không framework tự chế).
 
 **Tiêu chí thành công**
 
 | # | Tiêu chí | Đo bằng |
 |---|---|---|
-| S1 | Pipeline chạy tự động hằng ngày, end-to-end, ≥ 7 ngày liên tục | `log_pipeline_run` |
-| S2 | Rerun bất kỳ ngày nào → kết quả không đổi | idempotency test |
-| S3 | Thêm 1 entity mới **không cần viết code** | thêm config + PR |
-| S4 | Số trên report = số SQL = số reconcile | `recon_result` |
-| S5 | Mọi drill (Q11, Q12, Q14, Q15, Q16) có runbook + bằng chứng | `docs/runbook.md` |
-| S6 | CI xanh: lint, unit test, không hardcode, không notebook mồ côi | GitHub Actions |
+| S1 | Chạy end-to-end tự động ≥ 7 ngày giả lập liên tục | `meta.log_pipeline_run` |
+| S2 | Chạy lại bất kỳ ngày nào → kết quả không đổi | chạy 2 lần, so count + tổng tiền |
+| S3 | Thêm 1 entity nguồn mới → chỉ thêm config (Bronze) | PR chỉ đụng `nb_setup_config` |
+| S4 | Report = SQL = recon | `meta.recon_result` |
+| S5 | Drill Q11, Q12, Q14, Q15, Q16 có runbook + bằng chứng | `docs/runbook.md` |
 
 ---
 
 ## 1. Nguyên tắc cốt lõi
 
-> Đây là luật của dự án. Mọi thiết kế, code, review đều đối chiếu với danh sách này. Vi phạm → không merge.
+> Luật của dự án. Mọi thiết kế/code/review đối chiếu danh sách này.
 
-| # | Nguyên tắc | Nghĩa là | Kiểm chứng bằng |
-|---|---|---|---|
-| **P1** | **Git là nguồn sự thật** | Code, config, DDL, semantic model đều nằm trong repo, thay đổi qua PR. Workspace có thể dựng lại hoàn toàn từ repo + data nguồn. | Dựng lại Prod từ `main` |
-| **P2** | **Config-driven, code generic** | Thêm entity/cột/rule = thêm config, không thêm code. Code riêng chỉ cho **logic nghiệp vụ đặc thù** (survivorship, SCD2 hierarchy, fact). | S3 |
-| **P3** | **Không hardcode** | Môi trường → Variable Library + `paths`. Luật nghiệp vụ → bảng `ref_*`. Tham số vận hành → config. Không GUID, không path tuyệt đối, không magic string nghiệp vụ trong code. | CI `check_hardcode` |
-| **P4** | **Một logic — một chỗ (DRY)** | Mọi hàm dùng chung nằm trong package `companya_de`. Không copy-paste giữa notebook. SQL/DAX không lặp lại logic ETL. | Review + CI |
-| **P5** | **Incremental mặc định, full reload luôn có** | Mỗi bước xử lý phần thay đổi (watermark / batch / CDF). Mỗi bảng có chế độ `p_full_reload` để rebuild khi cần. | test 2 chế độ ra cùng kết quả |
-| **P6** | **Idempotent & tất định** | Rerun cùng tham số → cùng kết quả. Không dùng `now()` trong logic nghiệp vụ. Surrogate key tất định (hash). Watermark chỉ tiến khi bước thành công. | idempotency test (S2) |
-| **P7** | **Raw bất biến, downstream rebuild được** | Landing & Bronze là append-only, giữ lâu dài (snapshot master giữ **vĩnh viễn** vì nguồn không có lịch sử). Silver/Gold luôn tái tạo được từ Bronze. | drill rebuild |
-| **P8** | **Không mất dữ liệu, không im lặng** | Dòng lỗi → quarantine + lý do. Lỗi → log + alert. Không `dropna()`/`filter` âm thầm. | `in = out + rejected + deduped` |
-| **P9** | **Reconcile mọi bước** | Count & sum khớp Source → Bronze → Silver → Gold → Semantic model. | `recon_result` (S4) |
-| **P10** | **Observable & truy vết được** | Mọi task ghi log; `_run_id`, `_batch_id` đi xuyên các layer; biết mỗi dòng đến từ file/batch nào. | `log_task_run` |
-| **P11** | **Contract giữa các layer** | Schema chỉ thay đổi qua migration + `schema_registry`. Không layer nào đọc "lách" layer khác (Gold không đọc Bronze). | migration log |
-| **P12** | **Thiết kế cho quy mô lớn** | Không full scan khi không cần; partition pruning; không `collect()`/`toPandas()` dữ liệu lớn; không loop Python trên dòng; file size hợp lý. | review + drill Q12 |
-| **P13** | **Mọi thứ phải có lý do tồn tại** | Không dead code. Notebook phải thuộc 1 pipeline/DAG hoặc nhóm `setup`/`ops`/`sim`. Notebook nháp không commit. | CI `check_orphans` |
-| **P14** | **Test trước khi promote** | Unit test cho hàm, data test cho bảng, idempotency + recon trước khi merge `main`. | CI + PR checklist |
-| **P15** | **Đơn giản trước, tối ưu có đo đạc** | Làm đúng trước, tối ưu sau; mọi tối ưu phải có số liệu trước/sau. Quyết định lớn ghi ADR. | `docs/adr/`, runbook |
+| # | Nguyên tắc | Nghĩa là |
+|---|---|---|
+| **P1** | **Git là nguồn sự thật** | Notebook, pipeline, DDL, config, semantic model đều qua Git; workspace dựng lại được từ repo |
+| **P2** | **Phần cơ học → config; phần nghiệp vụ → SQL tường minh** | Ingest/Bronze/log/DQ/maintenance chạy generic theo bảng config. Silver/Gold là SQL viết rõ cho từng bảng (đó là logic nghiệp vụ, phải đọc được) |
+| **P3** | **Không hardcode** | Không ID/path tuyệt đối (lakehouse gắn theo **tên**); luật nghiệp vụ nằm trong bảng `ref_*` (vd "doanh thu" = `ref_order_status.is_sales_recognized`, không viết `'Delivered'`); tham số vận hành trong `cfg_*` |
+| **P4** | **Một logic — một chỗ** | Hàm parse/làm sạch dùng chung = **SQL function** định nghĩa 1 lần (`nb_common`); log/DQ/metrics do runner làm, notebook nghiệp vụ không lặp lại |
+| **P5** | **Incremental mặc định, full reload luôn có** | Mỗi bước xử lý phần thay đổi; tham số `p_full_reload` để rebuild |
+| **P6** | **Idempotent** | Chạy lại cùng tham số → cùng kết quả: `MERGE` theo khoá, hoặc `DELETE` theo batch/partition rồi `INSERT`; watermark chỉ tiến khi thành công; không dùng `current_date()` trong logic |
+| **P7** | **Raw bất biến, downstream rebuild được** | `Files/landing` + `brz.*` append-only, giữ lâu (snapshot master giữ vĩnh viễn) → Silver/Gold dựng lại được |
+| **P8** | **Không mất dữ liệu, không im lặng** | Dòng lỗi → `quarantine` kèm lý do; lỗi → log + alert |
+| **P9** | **Reconcile mọi bước** | count & tổng tiền khớp Source → Bronze → Silver → Gold → report |
+| **P10** | **Truy vết được** | `_batch_id`, `_run_id` đi xuyên các layer; mọi bước có log |
+| **P11** | **Contract giữa layer** | Layer chỉ đọc schema của layer ngay trước (+ `meta`); đổi schema qua cell DDL mới trong `nb_setup_ddl` |
+| **P12** | **Thiết kế cho quy mô lớn** | Không full scan khi không cần, partition pruning, không `collect()` dữ liệu lớn, file size hợp lý |
+| **P13** | **Không code chết** | Notebook nào cũng nằm trong pipeline/runner hoặc thuộc nhóm `setup`/`ops`/`sim`; notebook nháp để folder `sandbox` không commit |
+| **P14** | **Kiểm trước khi promote** | DQ + recon + chạy lại 2 lần xanh trên Dev mới merge `main` |
+| **P15** | **Đơn giản trước** | Chọn cách nhẹ nhất đủ đúng; tối ưu khi có số đo; quyết định lớn ghi ADR |
 
 ---
 
 ## 2. Kiến trúc tổng thể
 
 ```
-┌──────────────────── CompanyA-Source (giả lập hệ thống của team khác) ───────────────────┐
-│  sqldb_erp_wholesale  (Fabric SQL Database)      lh_retail_drop  (Lakehouse, Files only) │
-│   dbo.orders / customers / products /             Files/inbound/<source>/<entity>/       │
-│   sales_hierarchy — PK/FK, UTC, index updated_at      <entity>_YYYYMMDD[_vN].csv         │
-│                         ▲                                    ▲                           │
-│                         └──────── nb_00_sim_* (05:00) ───────┘                           │
-└─────────────────────────┬────────────────────────────────────┬───────────────────────────┘
-                          │ Copy activity (watermark)          │ Copy activity (LastModified)
-                          ▼                                    ▼
+┌──────────────── CompanyA-Source (đã xong — giả lập hệ thống của team khác) ──────────────┐
+│ sqldb_erp_wholesale (Fabric SQL DB)            lh_retail_drop (Files only)               │
+│   dbo.customers/products/sales_hierarchy/orders   Files/inbound/<source>/<entity>/*.csv  │
+│                 ▲                                          ▲                             │
+│                 └────────── nb_00_sim_daily (virtual clock) ┘                            │
+└─────────────────┬──────────────────────────────────────────┬─────────────────────────────┘
+                  │ Copy activity (watermark updated_at)      │ Copy activity (LastModified)
+                  ▼                                           ▼
 ┌──────────────── CompanyA-DataPlatform-<Dev|Prod> ───────────────────────────────────────┐
-│ lh_platform  (1 lakehouse, schema-enabled — mỗi layer 1 schema)                          │
-│  Files/landing/<src>/<entity>/load_date=…/batch=…/   (immutable raw)                     │
-│  brz.  brz_<src>_<entity>  (append, all-string, + metadata)                              │
-│      │  map · cast · standardize · dedup · conform · quarantine                          │
-│      ▼                                                                                   │
-│  slv.  slv_* · quarantine_*                                                              │
-│      │  model · SCD · surrogate key · point-in-time                                      │
-│      ▼                                                                                   │
-│  gld.  gld_d_* · gld_f_* · gld_a_*                                                       │
-│      ▼                                                                                   │
-│ sm_sales (Direct Lake → gld.*) → rpt_sales      sm_ops (→ meta.*) → rpt_pipeline_health  │
+│ lh_platform  (1 lakehouse, schema-enabled)                                               │
+│   Files/landing/<source>/<entity>/load_date=…/batch=…/      raw, bất biến                │
+│   brz.   brz_<source>_<entity>     all-string + metadata     ← nb_brz_load (generic)     │
+│   slv.   slv_<entity>, quarantine_<entity>                   ← nb_slv_* (%%sql)          │
+│   gld.   gld_d_*, gld_f_*, gld_a_*                           ← nb_gld_* (%%sql)          │
+│   meta.  cfg_*, ref_*, state_*, log_*, dq_*, recon_*                                     │
 │                                                                                          │
-│  meta. cfg_* (config) · ref_* (luật nghiệp vụ) · state_* · log_* · dq_* · recon_*        │
-│ pl_master_daily · pl_ingest · pl_backfill · pl_maintenance                               │
-│ nb_run_layer · nb_* đặc thù · env_common (wheel companya_de) · vl_config                 │
+│ pl_master_daily → pl_ingest → nb_run_layer(brz|slv|gld) → nb_ops_recon → refresh model   │
+│ sm_sales (Direct Lake → gld.*) → rpt_sales        rpt_pipeline_health (→ meta.*)         │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Ranh giới**
-
 | Quy tắc | Lý do |
 |---|---|
-| Platform chỉ **đọc** Source; simulator không chạm Platform | mô phỏng ranh giới 2 team |
-| Ingest bằng **copy** (không shortcut/mirroring) | thể hiện ingest thật: watermark, landing, manifest |
-| Dev & Prod đọc cùng Source, **state riêng** (watermark, manifest) | chạy lại Dev không ảnh hưởng Prod |
-| **1 lakehouse `lh_platform`, mỗi layer 1 schema** (`brz`, `slv`, `gld`, `meta`) | ít item, 1 SQL endpoint, join `schema.table` tự nhiên, khớp quy ước đề (`gld.gld_f_orders` ở Q17). Phân quyền theo schema bằng OneLake data access roles; analyst dùng semantic model. Tách thành nhiều lakehouse sau vẫn dễ vì path dựng từ config (ADR 010) |
-| Layer chỉ đọc schema của layer ngay trước nó (+ `meta`) | contract rõ (P11) — không còn ranh giới vật lý nên kiểm bằng review + CI (`check_layer_reads`) |
+| Platform chỉ **đọc** Source; simulator không chạm Platform | ranh giới 2 team |
+| Ingest bằng **Copy** (không shortcut/mirroring) | thể hiện ingest thật: watermark, landing, manifest |
+| Dev & Prod đọc cùng Source, **state riêng** | chạy lại Dev không ảnh hưởng Prod |
+| **1 lakehouse, mỗi layer 1 schema** (ADR 010) | gọn, 1 SQL endpoint, khớp đề (`gld.gld_f_orders`) |
 
 ---
 
-## 3. Môi trường, Git & CI/CD
+## 3. Môi trường & Git
 
-### 3.1 Workspace ↔ Git
+| Workspace | Branch | Git folder |
+|---|---|---|
+| `CompanyA-Source` | `dev` | `fabric/source` |
+| `CompanyA-DataPlatform-Dev` | `dev` | `fabric/platform` |
+| `CompanyA-DataPlatform-Prod` | `main` | `fabric/platform` |
 
-| Workspace | Branch | Git folder | Ghi chú |
-|---|---|---|---|
-| `CompanyA-Source` | `dev` | `fabric/source` | 1 bản duy nhất |
-| `CompanyA-DataPlatform-Dev` | `dev` | `fabric/platform` | làm việc hằng ngày |
-| `CompanyA-DataPlatform-Prod` | `main` | `fabric/platform` | chỉ nhận qua PR |
+**Luồng làm việc (web UI):** sửa trên ws Dev → Source control → Commit (`dev`) → PR `dev → main` trên GitHub → ws Prod: Update all → chạy `nb_setup_ddl`, `nb_setup_config` → chạy pipeline.
 
-Source nối `dev` vì Fabric commit thẳng lên branch; `main` có branch protection.
+- Commit message: `feat(slv): …`, `fix(dq): …`, `docs: …`. Tag mỗi milestone (`v0.1`, `v1.0`).
+- **Quy tắc tránh conflict:** không sửa cùng 1 notebook ở 2 nơi; sửa trên Fabric thì Commit ngay; có Update đến thì Update trước khi sửa tiếp.
+- **Không hardcode môi trường:** mọi notebook Platform gắn `lh_platform` làm default lakehouse **theo tên** (cell đầu `%%configure`), Fabric tự lấy lakehouse của workspace đang chạy (Dev/Prod). Bảng gọi bằng `schema.table`, file bằng `Files/...` tương đối.
 
-### 3.2 Cấu trúc repo
+**Repo**
 
 ```
 Fabric-DE-Prj/
-├── .github/workflows/ci.yml        lint · test · checks · build wheel
-├── src/companya_de/                package dùng chung (P4)
-│   ├── env.py                      paths, Variable Library, runtime context
-│   ├── config.py                   đọc cfg_* / ref_* ; validate
-│   ├── io.py                       read_incremental, write_batch, merge_delta
-│   ├── scd.py                      scd1_merge, scd2_merge
-│   ├── transforms.py               parse_multi_date, apply_mapping, standardize, dedup_latest
-│   ├── keys.py                     surrogate key tất định
-│   ├── dq.py                       rule engine, quarantine
-│   ├── recon.py
-│   ├── logging.py                  run/task log, manifest
-│   ├── runner.py                   build DAG từ cfg_pipeline_step → runMultiple
-│   └── config/                     ⇦ CONFIG AS CODE (YAML) — đóng gói theo wheel
-│       ├── source_entity.yml  column_mapping.yml  table.yml
-│       ├── pipeline_step.yml  dq_rule.yml
-│       └── ref_order_status.yml  ref_value_mapping.yml  ref_holiday_vn.yml
-├── tests/
-│   ├── unit/                       pytest + Spark/Delta trong Docker
-│   └── golden/                     số liệu kỳ vọng cho simulator seed cố định
-├── migrations/                     V001__meta.sql, V002__silver.sql, …  (P11)
-├── tools/                          check_hardcode.py · check_orphans.py · check_outputs.py
-├── fabric/
-│   ├── source/                     sqldb_erp_wholesale.SQLDatabase · lh_retail_drop · nb_00_sim_*
-│   └── platform/                   lh_platform · nb_* · pl_* · env_common · vl_config · sm_* · rpt_*
-├── sql/answers/                    q05 … q07, q17, q18 …
-├── docs/
-│   ├── PLAN.md  architecture.md  conventions.md  runbook.md  dq_findings.md
-│   ├── adr/                        001-…md
-│   └── diagrams/
+├── fabric/source/      ← CompanyA-Source (Git sync) — xong
+├── fabric/platform/    ← DataPlatform Dev/Prod (Git sync): lh_platform, nb_*, pl_*, sm_*, rpt_*
+├── sql/answers/        ← q05, q06, q07, q17 … (câu trả lời SQL của đề)
+├── docs/               ← PLAN.md, runbook.md, dq_findings.md, adr/
 └── README.md
 ```
 
-### 3.3 Luồng làm việc
-
-```
-feat/<x> từ dev
-  ├─ code package (local) → pytest → push → CI build wheel (artifact, version = git tag/sha)
-  ├─ upload wheel vào env_common (Dev) → publish
-  └─ sửa notebook/pipeline trên ws Dev → Commit
-PR feat/<x> → dev     (CI xanh + checklist)
-PR dev → main          (idempotency + recon xanh trên Dev)
-ws Prod: Update all → env_common dùng wheel cùng version → nb_setup (migrate + config) → chạy
-tag vX.Y
-```
-
-### 3.4 Tách cấu hình theo môi trường
-
-- Path: `env.paths()` lấy workspace hiện tại từ `notebookutils.runtime.context` → abfss tới lakehouse theo **tên**. Không dựa vào default lakehouse.
-- Giá trị khác nhau theo môi trường (connection Source, email alert, scale factor, lịch) → **Variable Library `vl_config`** (value set `dev` / `prod`).
-- Tên item giống hệt nhau ở Dev và Prod.
-- Hướng mở rộng (ADR): `fabric-cicd` deploy từ repo + `parameter.yml` thay ID theo môi trường, thay cho cơ chế workspace sync branch.
-
-### 3.5 CI (GitHub Actions)
-
-| Job | Làm gì | Fail khi |
-|---|---|---|
-| `lint` | ruff trên `src/`, `tests/`, `fabric/**/notebook-content.py` | lỗi lint |
-| `unit` | pytest trong cùng image Docker với local (Java 21, Python 3.13, Spark 4.1.1, Delta 4.2.0) | test fail |
-| `config` | validate YAML theo schema (pydantic): key tồn tại, mapping đủ cột key, rule tham chiếu bảng có thật | config sai |
-| `check_hardcode` | quét code cell: GUID, `abfss://`, `onelake.dfs`, literal nghiệp vụ trong danh sách cấm (`'Delivered'`, …) | tìm thấy |
-| `check_orphans` | notebook không thuộc `cfg_pipeline_step`/pipeline và không thuộc nhóm `setup`/`ops`/`sim` | có mồ côi |
-| `check_outputs` | notebook commit kèm output lớn | có output |
-| `build` | build wheel `companya_de-<ver>.whl` | — |
-
-### 3.6 PR checklist
-
-- [ ] Tuân thủ P1–P15 (đặc biệt P2, P3, P4, P13)
-- [ ] Logic mới nằm trong package, có unit test
-- [ ] Thay đổi schema có migration; config có PR riêng hoặc cùng PR, đã validate
-- [ ] Đã chạy trên Dev: 2 lần cùng `p_load_date` → không đổi; recon xanh
-- [ ] Docs/runbook/ADR cập nhật nếu thay đổi hành vi
-
 ---
 
-## 4. Engineering standards
+## 4. Cách viết code: SQL-first
 
-### 4.1 Phân vai code
+### 4.1 Ai làm gì
 
-| Lớp | Chứa | Không chứa |
+| Việc | Công cụ | Lý do |
 |---|---|---|
-| **Package `companya_de`** | mọi logic tái sử dụng: IO, merge, SCD, transform, DQ, log, runner | tên bảng/cột cụ thể của 1 entity |
-| **Config YAML** | entity, mapping cột, thuộc tính bảng, DAG, rule, luật nghiệp vụ | logic |
-| **Notebook generic** (`nb_run_layer`, `nb_slv_generic`, `nb_brz_load`) | gọi package theo config | if/else theo tên entity |
-| **Notebook đặc thù** (`nb_slv_customer`, `nb_gld_d_salesman`, `nb_gld_f_sales_line`, …) | logic nghiệp vụ riêng, gọi hàm package | hàm tiện ích tự viết lại |
-| **Pipeline** | thứ tự, song song, retry, copy data, alert | transform |
+| Kéo data từ nguồn → `Files/landing` | **Pipeline Copy activity** | không code, có retry/song song/incremental |
+| Landing → `brz.*` | **1 notebook generic** `nb_brz_load` | giống nhau mọi entity → viết 1 lần, chạy theo config |
+| Bronze → Silver → Gold | **Notebook `%%sql`**, mỗi bảng 1 notebook | logic nghiệp vụ → SQL tường minh, ai cũng đọc được |
+| Thứ tự chạy, log, DQ, metrics | **Runner** `nb_run_layer` (Python mỏng) | làm 1 lần cho mọi bước → notebook SQL không phải lặp lại |
+| Hàm làm sạch dùng chung | **SQL function** trong `nb_common` | `parse_ts(...)`, `clean_text(...)`… gọi được từ mọi `%%sql` |
+| Q9 (dim_date), Q10 (Silver orders) | **PySpark** | đề yêu cầu PySpark → dùng chính notebook đó trong pipeline (không viết 2 bản) |
 
-### 4.2 Notebook template (bắt buộc)
+### 4.2 Tránh trùng lặp (P4)
 
-```python
-# CELL 1 — Header (markdown)
-#   Purpose · Inputs · Outputs · Grain · Load method · Owner · Related ADR
+| Thứ dễ lặp | Cách gom về 1 chỗ |
+|---|---|
+| Parse ngày nhiều format, trim/hoa-thường, ép số an toàn | **SQL function** định nghĩa 1 lần trong `nb_common`: `parse_ts(s)`, `clean_text(s)`, `clean_code(s)`, `to_amount(s)` |
+| Chuẩn hoá giá trị (gender, position, status, brand…) | **Bảng `meta.ref_value_mapping`** + JOIN — không `CASE WHEN` rải rác |
+| Định nghĩa "doanh thu" | **`meta.ref_order_status`** (`is_sales_recognized`) |
+| Ghi log, đếm dòng, chạy DQ sau mỗi bước | **Runner** làm quanh mỗi notebook; số dòng lấy từ Delta history của bảng đích |
+| Load Bronze cho từng entity | **1 notebook generic** + `meta.cfg_source_entity` |
+| Danh sách bước & thứ tự | **`meta.cfg_pipeline_step`** (runner đọc) — không liệt kê cứng trong pipeline |
+| Mẫu SCD1/SCD2 | SCD1 = `MERGE` chuẩn; SCD2 chỉ có 1 bảng (`gld_d_salesman`) → không cần trừu tượng hoá |
 
-# CELL 2 — Parameters (parameter cell)
-p_load_date = None        # 'YYYY-MM-DD' — logical date
-p_run_id = None
-p_entity = None
-p_full_reload = False
+### 4.3 Khung 1 notebook nghiệp vụ (Silver/Gold)
 
-# CELL 3 — Setup
-from companya_de import env, config, io, dq, logging as dlog
-ctx = env.context(p_load_date, p_run_id)          # paths, vl_config, timezone, run_id
-task = dlog.task_start(ctx, layer=..., entity=p_entity)
-
-# CELL 4 — Body
-try:
-    df = io.read_incremental(ctx, source=..., full=p_full_reload)
-    df = ...                                       # chỉ gọi hàm package
-    df_ok, df_bad = dq.validate(ctx, df, ruleset=...)
-    metrics = io.merge_delta(ctx, df_ok, target=...)
-    dq.quarantine(ctx, df_bad, ...)
-    dlog.task_end(task, "SUCCESS", metrics)
-except Exception as e:
-    dlog.task_end(task, "FAILED", error=e)
-    raise
+```
+Cell 0  %%configure  → default lakehouse = lh_platform (theo tên)
+Cell 1  (markdown)   Mục đích · Input · Output · Grain · Cách load
+Cell 2  (parameters) p_load_date, p_run_id, p_full_reload
+Cell 3  %run nb_common              → đăng ký SQL function, set biến SQL
+Cell 4+ %%sql                       → CREATE OR REPLACE TEMP VIEW src … (chỉ phần thay đổi)
+                                     → MERGE INTO slv.xxx … / INSERT INTO quarantine_xxx …
 ```
 
-### 4.3 Coding rules
+Không có code log/DQ trong notebook — runner lo (P4).
 
-- Spark DataFrame API / Spark SQL; **không** pandas cho dữ liệu lớn; **không** UDF Python khi có hàm built-in.
-- Hàm thuần (input DataFrame → output DataFrame), không side effect ngoài `io`/`logging`.
-- Không `collect()`, `count()` thừa, `cache()` vô tội vạ; mọi action có lý do.
-- Type hints + docstring ngắn cho hàm public; ruff mặc định.
-- Tên hàm/biến tiếng Anh; comment/docs tiếng Việt hoặc Anh đều được nhưng nhất quán theo file.
-- Notebook nháp: folder `sandbox/` trong workspace, **không commit** (P13).
+### 4.4 Kiểm thử (thay cho unit test)
 
-### 4.4 Chiến lược test
-
-| Tầng | Công cụ | Nội dung |
-|---|---|---|
-| Unit | pytest + Spark/Delta trong Docker (`docker compose run --rm test`) | transforms, keys, scd1/scd2, merge idempotent, mapping, dq rule → SQL |
-| Config | pydantic schema | YAML hợp lệ, tham chiếu chéo đúng |
-| Data | DQ engine | mỗi run, mỗi layer |
-| Idempotency | `nb_ops_test_idempotency` | chạy 1 ngày 2 lần → so `count` + checksum từng bảng |
-| Full vs incremental | `nb_ops_test_rebuild` | rebuild full từ Bronze == kết quả incremental |
-| Golden | simulator seed cố định N ngày | tổng orders / sales / số SCD2 version khớp `tests/golden/` |
+| Mức | Cách |
+|---|---|
+| Đúng dữ liệu | DQ rule sau mỗi bước (`meta.cfg_dq_rule`) |
+| Không mất/không thừa | Recon count + tổng tiền giữa các layer |
+| Idempotent | `nb_ops_check_idempotency`: chạy lại 1 ngày → so count + checksum từng bảng |
+| Rebuild | `p_full_reload` từ Bronze == kết quả incremental |
 
 ---
 
@@ -281,651 +186,309 @@ except Exception as e:
 
 | Loại | Pattern | Ví dụ |
 |---|---|---|
-| Lakehouse | `lh_<scope>` | `lh_platform` (Platform), `lh_sim`, `lh_retail_drop` (Source) |
-| Schema (layer) | `brz` · `slv` · `gld` · `meta` | `gld.gld_f_sales_line` |
-| Notebook generic | `nb_<verb>_<scope>` | `nb_run_layer`, `nb_brz_load` |
-| Notebook đặc thù | `nb_<layer>_<entity>` | `nb_gld_d_salesman` |
-| Notebook nhóm khác | `nb_setup_*` · `nb_ops_*` · `nb_00_sim_*` | `nb_setup_migrate` |
+| Lakehouse | `lh_<scope>` | `lh_platform` |
+| Schema | `brz` · `slv` · `gld` · `meta` | |
+| Bảng | `brz_<source>_<entity>` · `slv_<entity>` · `gld_d_` / `gld_f_` / `gld_a_` · giữ prefix dù có schema (khớp đề) | `gld.gld_f_sales_line` |
+| Meta | `cfg_*` config · `ref_*` luật nghiệp vụ · `state_*` runtime · `log_*` · `dq_*` · `recon_*` | `meta.state_watermark` |
+| Notebook | `nb_<layer>_<entity>` · `nb_setup_*` · `nb_ops_*` · `nb_run_layer` · `nb_common` | `nb_slv_customer` |
 | Pipeline | `pl_<scope>` | `pl_master_daily` |
-| Bảng | `brz_<src>_<entity>` · `slv_<entity>` · `gld_d_` / `gld_f_` / `gld_a_` — giữ prefix layer dù đã có schema (khớp đề, không nhầm khi bảng hiện không kèm schema trong semantic model / Power BI) | `gld.gld_f_sales_line` |
-| Meta | `cfg_*` (config) · `ref_*` (luật nghiệp vụ) · `state_*` (runtime) · `log_*` · `dq_*` · `recon_*` | `state_watermark` |
-| Cột | snake_case · `*_sk` surrogate · `*_code` natural · `*_key` date · `is_*` · `*_at` timestamp UTC · `*_date` date nghiệp vụ | |
+| Cột | snake_case · `*_sk` surrogate · `*_code` natural · `*_key` date · `is_*` · `*_at` timestamp UTC · `*_date` ngày nghiệp vụ | |
 
-### 5.2 Metadata columns
+### 5.2 Cột kỹ thuật
 
-| Cột | Bronze | Silver | Gold | Ý nghĩa |
+| Cột | brz | slv | gld | Ý nghĩa |
 |---|---|---|---|---|
-| `_source_system` | ✓ | ✓ | ✓ | `wholesale` / `retail` |
-| `_source_file` | ✓ | ✓ | | file gốc (nguồn file) |
-| `_batch_id` | ✓ | ✓ | ✓ | `<src>_<entity>_<load_date>_<run_id>` |
-| `_run_id` | ✓ | ✓ | ✓ | lần chạy pipeline |
+| `_source_system` | ✓ | ✓ | ✓ | `wholesale` / `retail` / `reference` |
+| `_source_file` | ✓ (file) | ✓ | | file gốc |
+| `_batch_id` | ✓ | ✓ | ✓ | `<source>_<entity>_<yyyymmdd>_<run_id>` |
+| `_run_id` | ✓ | ✓ | ✓ | lần chạy |
 | `_ingested_at` | ✓ | | | thời điểm vào Bronze |
-| `_record_hash` | | ✓ | ✓ | hash cột nghiệp vụ → phát hiện thay đổi |
-| `_inserted_at` / `_updated_at` | | ✓ | ✓ | ghi / cập nhật dòng |
-| `_valid_from` / `_valid_to` / `_is_current` | | | SCD2 | lịch sử |
+| `_record_hash` | | ✓ | ✓ | hash cột nghiệp vụ → chỉ update khi đổi |
+| `_inserted_at` / `_updated_at` | | ✓ | ✓ | |
+| `_valid_from` / `_valid_to` / `_is_current` | | | SCD2 | |
 
-### 5.3 Thời gian
+### 5.3 Thời gian & khoá
 
-- Timestamp lưu **UTC** (`*_at`). Nguồn retail không có timezone → `source_timezone` trong `cfg_source_entity` để quy đổi.
-- Ngày nghiệp vụ (`order_date`, `date_key`, tháng báo cáo) theo **`business_timezone = Asia/Ho_Chi_Minh`** (config).
-- `p_load_date` là **logical date**, không phải ngày máy chạy.
-
-### 5.4 Keys
-
-- Surrogate key **tất định**: `xxhash64(<natural_key>[, _valid_from])` → rebuild bao nhiêu lần cũng cùng SK, không phụ thuộc thứ tự (P6). DQ rule `unique` trên SK để phát hiện va chạm.
-- Unknown member `sk = -1` cho mọi dim.
-- `date_key = YYYYMMDD` (int).
+- Timestamp lưu **UTC**; nguồn file không có múi giờ → `cfg_source_entity.source_timezone`.
+- Ngày nghiệp vụ (`order_date`, `date_key`) theo **Asia/Ho_Chi_Minh**. `p_load_date` = ngày logic (virtual clock).
+- Surrogate key **tất định**: `xxhash64(natural_key[, _valid_from])` → rebuild bao nhiêu lần cũng cùng SK. Unknown member `-1`. `date_key = YYYYMMDD`.
 
 ---
 
-## 6. Config, reference data & state
+## 6. Bảng meta: config, ref, state, log
 
-### 6.1 Ba loại bảng meta — tách rõ
-
-| Loại | Ai ghi | Nguồn sự thật | Ví dụ |
-|---|---|---|---|
-| **Config** `cfg_*` | `nb_setup_config` (từ YAML) | **Git** | entity, mapping, table, DAG, DQ rule |
-| **Reference** `ref_*` | `nb_setup_config` (từ YAML) | **Git** | trạng thái đơn, mapping giá trị, ngày lễ |
-| **State** `state_*` | pipeline lúc chạy | runtime | watermark, CDF version, manifest |
-| **Log** `log_*`, `dq_result_log`, `recon_result` | pipeline lúc chạy | runtime | — |
-
-Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR → `nb_setup_config` MERGE vào bảng (idempotent). Runtime không bao giờ ghi config.
-
-### 6.2 Config tables
-
-**`cfg_source_entity`** — mỗi entity × nguồn
-
-| Cột | Ví dụ |
-|---|---|
-| `source_system`, `entity`, `source_type` | `retail`, `orders`, `file` |
-| `source_object` | `dbo.orders` / `inbound/orders/` |
-| `load_type` | `incremental` / `full_snapshot` |
-| `watermark_column`, `lookback_days` | `updated_at`, `2` |
-| `source_timezone`, `date_formats` | `Asia/Ho_Chi_Minh`, `["M/d/yyyy H:mm", …]` |
-| `bronze_table` | `brz_retail_orders` |
-| `is_active`, `load_order` | `true`, `20` |
-
-**`cfg_column_mapping`** — map nguồn → schema chuẩn Silver (nền tảng của Silver generic)
-
-| Cột | Ví dụ |
-|---|---|
-| `entity`, `source_system` | `customer`, `retail` |
-| `source_column`, `target_column` | `created_at`, `inserted_at` |
-| `data_type` | `timestamp` |
-| `transform` | `parse_multi_date` / `std_text:title` / `map:gender` / `percent` |
-| `is_business_key`, `is_nullable`, `is_tracked` | `false`, `false`, `true` |
-
-**`cfg_table`** — thuộc tính vật lý mỗi bảng đích (nguồn cho DDL, maintenance, P12)
-
-`table_name, layer, partition_cols, cluster_cols, v_order, enable_cdf, deletion_vectors, optimize_schedule, vacuum_retention_hours, load_method (append|merge|scd1|scd2|replace_partition), business_keys`
-
-**`cfg_pipeline_step`** — DAG cho `nb_run_layer`
-
-`step_id, layer, notebook, args (json), depends_on (list), is_active, timeout_sec, retry`
-
-**`cfg_dq_rule`** — xem §12.
-
-### 6.3 Reference tables (luật nghiệp vụ — P3)
-
-| Bảng | Cột | Dùng cho |
+| Loại | Ai ghi | Nguồn sự thật |
 |---|---|---|
-| `ref_order_status` | `status, sequence, is_final, is_sales_recognized` | "Delivered sales" = `is_sales_recognized` → không viết `'Delivered'` trong code/SQL/DAX |
-| `ref_value_mapping` | `domain, source_value, standard_value` | gender, position, brand, country |
-| `ref_holiday_vn` | `holiday_date, holiday_name` | `gld_d_date.is_holiday` |
-| `ref_fiscal` | `fiscal_start_month` (=7) | fiscal year |
+| `cfg_*` config | `nb_setup_config` (`%%sql MERGE … VALUES`) | **Git** (nội dung notebook) |
+| `ref_*` luật nghiệp vụ | `nb_setup_config` | **Git** |
+| `state_*` | pipeline khi chạy | runtime |
+| `log_*`, `dq_result_log`, `recon_result` | runner khi chạy (append-only) | runtime |
 
-### 6.4 State tables
+**Không sửa tay `cfg_*`/`ref_*` trên Fabric** — sửa trong `nb_setup_config` → Commit → chạy lại (MERGE idempotent, xoá dòng không còn trong script).
 
-- `state_watermark(step, entity, watermark_type [timestamp|delta_version], value, run_id, updated_at)`
-- `state_file_manifest(file_id, source_system, entity, file_path, file_name, size, checksum, modified_at, batch_id, status [NEW|LOADED|DUPLICATE|FAILED], task_id, registered_at, loaded_at)`
-- `schema_registry(table, column, data_type, layer, status [DETECTED|APPROVED|ACTIVE], first_seen_batch, approved_at)`
-- `meta_schema_migrations(version, script, checksum, applied_at)`
+| Bảng | Cột chính | Dùng cho |
+|---|---|---|
+| `cfg_source_entity` | source_system, entity, source_type (db/file), source_object, load_type (incremental/full_snapshot), watermark_type (column/file_modified), watermark_column, lookback_days, source_timezone, business_keys, is_active, load_order | `pl_ingest`, `nb_brz_load` |
+| `cfg_pipeline_step` | layer, step, notebook, depends_on, is_active, timeout | `nb_run_layer` |
+| `cfg_dq_rule` | rule_id, layer, table_name, check_type, sql_expression, severity, action, is_active | runner → DQ |
+| `ref_order_status` | status, sequence, is_final, is_sales_recognized | Silver/Gold |
+| `ref_value_mapping` | domain, source_value, standard_value | Silver |
+| `ref_holiday_vn` | holiday_date, holiday_name | `gld_d_date` |
+| `state_watermark` | step, source_system, entity, watermark_value, run_id, updated_at | ingest |
+| `state_file_manifest` | file_id, path, size, modified_at, checksum, batch_id, status, event_at | file ingest (append-only) |
+| `log_pipeline_run` | run_id, pipeline, load_date, status, message, event_at | append-only |
+| `log_task_run` | task_id, run_id, layer, step, status, rows_*, delta_version, error, started/ended_at | append-only (RUNNING → SUCCESS/FAILED) |
+| `dq_result_log` | run_id, rule_id, checked_rows, failed_rows, status | |
+| `recon_result` | run_id, check_name, left/right count & amount, diff, status | |
+| `schema_registry` | table, column, type, status (DETECTED/APPROVED) | Q16 |
 
-### 6.5 Migrations
-
-`migrations/V###__<mô tả>.sql` — đánh số tăng dần, chỉ thêm không sửa. `nb_setup_migrate` áp dụng các version chưa có trong `meta_schema_migrations` (giống Flyway). Mọi DDL của Silver/Gold/meta đi qua đây (P11).
+Log & manifest **append-only** (không UPDATE): nhiều bước song song ghi cùng lúc không xung đột; trạng thái hiện tại = sự kiện mới nhất.
 
 ---
 
-## 7. Source simulator
+## 7. Source (đã xong)
 
-**Mục tiêu:** 2 nguồn "sống", data mới mỗi ngày, scale được, tái lập được (seed cố định).
-
-### 7.1 Item
-
-| Item | Thiết kế |
+| Item | Mô tả |
 |---|---|
-| `sqldb_erp_wholesale` | Fabric SQL Database, mô hình **hybrid** (ADR 008): ép `datetime2` UTC, PK, NOT NULL trên key; giữ nguyên giá trị bẩn (status, tax_rate, tên…); FK **khai báo nhưng NOCHECK**. `orders` có `order_line_id` IDENTITY làm PK (append theo status) + **index `updated_at`**. Schema `sim.stg_*` = staging nội bộ simulator. DDL: SQL project `fabric/source/sqldb_erp_wholesale.SQLDatabase/` (Git sync) là nguồn sự thật — thay đổi schema sửa trên DB rồi Commit. |
-| `lh_retail_drop` | drop zone của các nguồn file: `Files/inbound/<source>/<entity>/` — CSV giữ nguyên byte dữ liệu gốc (free-form). |
-| `lh_sim` | nội bộ simulator: `Files/seed/` (9 CSV đề bài), `seed_<src>_<entity>`, `sim_state`, `sim_release_log`, `sim_reject_log`. Platform **không** đọc. |
+| `sqldb_erp_wholesale` | ERP giả lập "hybrid" (ADR 008): ép kiểu timestamp/số + PK; giữ nguyên giá trị bẩn; FK khai báo nhưng không enforce. `orders` PK `order_line_id`, index `updated_at`. Schema `sim.stg_*` = staging nội bộ simulator (Platform không đọc). DDL = SQL project trong Git |
+| `lh_retail_drop` | `Files/inbound/<source>/<entity>/` — CSV nguyên trạng (retail, reference) |
+| `lh_sim` | seed 9 CSV, `seed_*`, `sim_state` (virtual clock), `sim_release_log`, `sim_reject_log` |
+| Nguồn | `wholesale` (erp): customers, products, sales_hierarchy, orders · `retail` (file): như trên · `reference` (file): categories |
 
-**Nguồn** (`SOURCES` trong `nb_00_sim_common`):
+**Virtual clock (ADR 009):** initial load tới 2025-12-31 (~42k dòng/nguồn, kèm ~40 dòng ngày sai 2027); mỗi lần `nb_00_sim_daily` tiến 1 ngày (~62 dòng/nguồn) tới ~2026-05-10; exit value = ngày giả lập → `p_load_date` cho Platform. Idempotent; pipeline luôn truyền `p_sim_date` cụ thể.
 
-| Source | Kiểu | Entity | Đích |
-|---|---|---|---|
-| `wholesale` | `erp` | customers, products, sales_hierarchy, orders | `sqldb_erp_wholesale.dbo.*` |
-| `retail` | `file` | customers, products, sales_hierarchy, orders | `inbound/retail/<entity>/` |
-| `reference` | `file` | categories | `inbound/reference/categories/` |
+**Dữ liệu cố ý bẩn (Platform phải xử lý):** format ngày lẫn lộn (file), status sai chính tả, tax `five percent`, qty âm/thập phân, orphan (`CUS099`, `PRD999`, `CAT010`, `CAT999`), `"NULL"` dạng chữ, ngày tương lai, **trùng** (`CAT005` 2 bản; cùng khách ở 2 nguồn khác thuộc tính; master gửi lại dạng snapshot).
 
-> **Vì sao hybrid:** đề mô tả wholesale "schema-enforced, FK enforced" nhưng data mẫu wholesale bẩn như retail (orphan `CUS099`/`PRD999`, status sai chính tả, qty âm, tax `five percent`, `CAT010` không tồn tại…). Enforce thật → lỗi bị chặn ở nguồn, platform không còn gì để xử lý/demo Q1/Q5.
->
-> **Vì sao `categories` là file `reference`, không thuộc ERP:** đề chỉ liệt kê bảng ERP là orders, customers, products, sales_hierarchy; file `categories.csv` không có hậu tố nguồn → file tham chiếu dùng chung. Đặt trong ERP thì PK chặn mất dòng trùng `CAT005` (2 phiên bản: `electronics/All-in-One` vs `Electronics/AllInOne`) — đó là issue Q1 mà Platform phải tự phát hiện (DQ `unique`) và xử lý bằng survivorship ở Silver. Với data seed hiện tại, ERP không từ chối dòng nào; cơ chế reject giữ cho generate/drill.
-
-### 7.2 Timeline
-
-**Virtual clock** — ngày giả lập (`lh_sim.sim_state.released_until`) độc lập với ngày thật; data giữ nguyên ngày gốc.
-
-- Mỗi dòng seed có `_release_date` = ngày nó "xuất hiện" ở nguồn: orders theo `updated_at`; master theo `max(created/inserted, updated)`.
-- Không parse được hoặc **sau `future_date_cutoff` (2026-12-31)** → coi là ngày sai đã nằm sẵn trong nguồn → release ở initial load (platform bắt bằng DQ `future_date`). Đây là ~40 dòng năm 2027 mỗi nguồn.
-- **Initial load** tới `initial_until = 2025-12-31`: ~42k dòng/nguồn (retail: 1 file `orders_history_until_20251231.csv`).
-- **Replay** mỗi lần tiến `p_days` (mặc định 1): 2026-01-01 → ~2026-05-10, ~130 ngày, median ~62 dòng/ngày/nguồn (retail 1 file/ngày).
-- Kịch bản đề rơi vào giai đoạn replay: Q14 (02/01 → 15/01/2026) ✅; Q15 (05/2026) chỉ có 1–10/05 từ seed; Q16 (01/06/2026) cần **generate**.
-- `p_sim_date` = nhảy tới đúng ngày (tua nhanh); exit value = ngày giả lập mới → `p_load_date` cho Platform. `pl_sim_drive(p_days)` lặp: sim 1 ngày → `pl_master_daily(p_load_date)`.
-- **Idempotency:** chạy lại sau lỗi → cùng cửa sổ (state chỉ tiến ở bước cuối), mọi ghi đều lặp được (MERGE · DELETE+INSERT 1 transaction · file trùng tên · log `replaceWhere window_to`). Gọi `p_days` nhiều lần = đồng hồ tiến nhiều lần (chủ đích). **Quy ước: pipeline luôn truyền `p_sim_date` cụ thể** → retry cùng ngày là no-op. Không chạy 2 phiên `nb_00_sim_daily` song song (không có lock; lịch/pipeline đảm bảo tuần tự).
-- Hết seed (~05/2026) → chuyển sang generate (7.4) — cần làm trước drill Q15/Q16.
-
-### 7.3 Notebook
-
-| Notebook | Làm gì | Trạng thái |
-|---|---|---|
-| `nb_00_sim_common` | config + hàm dùng chung (`%run`) | ✅ draft |
-| `nb_00_sim_setup` | seed CSV → `seed_*` + `_release_date` | ✅ draft |
-| `nb_00_sim_daily(p_days, p_sim_date)` | virtual clock: release cửa sổ `(released_until, released_until + p_days]`; nguồn `erp` → MERGE / xoá-chèn theo cửa sổ (1 transaction), vi phạm NOT NULL/PK → `sim_reject_log`; nguồn `file` → CSV nguyên trạng; chạy lại không nhân đôi; exit value = ngày giả lập | ✅ chạy được (initial load 2026-10-06) |
-| `nb_00_sim_reset` | xoá dữ liệu Source để replay từ đầu (`p_confirm = "RESET"`) | ✅ draft |
-| `nb_00_sim_master_change(p_sim_date)` | đổi master tại chỗ: địa chỉ khách, sản phẩm mới, **org chart** (promote/đổi manager/nghỉ) — không giữ lịch sử (đúng Q11) | P10 |
-| `nb_00_sim_late_orders` · `nb_00_sim_schema_v2` | drill Q14 · Q16 | P10 |
-
-### 7.4 Sinh order hằng ngày
-
-- **Giai đoạn 1 — replay:** phát lại 50k dòng gốc mỗi nguồn theo `_release_date` (7.2).
-- **Giai đoạn 2 — generate:** sinh đơn mới theo phân phối học từ data gốc (khách, sản phẩm, giá, số dòng/đơn, mùa vụ).
-- **Vòng đời status:** mỗi ngày một phần đơn cũ chuyển `Pending → Shipped → Delivered | Cancelled` → **dòng mới** (audit trail). Pipeline buộc phải xử lý thay đổi trên đơn cũ.
-- **`scale_factor`** (Variable Library): SF=1 → ~1–2k dòng/ngày (hằng ngày); SF=1000 → ~1–2M dòng/ngày (drill Q12).
-- **Bơm lỗi** theo `sim_scenario` (tỉ lệ): file trùng (khác tên), qty NULL/âm, price 0, orphan customer/salesman, ngày sai locale, cột thừa, dòng trùng, file rỗng, file đến trễ.
-- **Seed cố định** → kết quả tái lập được, dùng cho golden test.
-- Tối ưu: sinh bằng Spark (`range` + random seed), JDBC batch insert, CSV `coalesce` theo kích thước file thực tế.
+**Còn lại (Phase 10, cho drill):** generate khi hết seed, bơm lỗi file (trùng/rỗng/trễ), `master_change` (org chart cho SCD2), drill Q14/Q16.
 
 ---
 
 ## 8. Ingest & Bronze
 
-**Lands:** dữ liệu thô đúng như nguồn + metadata. **Leaves:** batch mới (`_batch_id`) cho Silver.
-
-### 8.1 Phân vai
-
-| Bước | Công cụ | Lý do |
-|---|---|---|
-| **Extract** Source → `lh_platform/Files/landing/` | **Pipeline Copy activity** | connector, incremental filter, retry, song song, output `rowsCopied/filesWritten`, không tốn Spark |
-| **Load** landing → `brz_*` | **1 notebook `nb_brz_load`** chạy mọi entity của run bằng `runMultiple` | 1 Spark session cho tất cả, thay vì N session |
-
-### 8.2 `pl_ingest`
+### 8.1 `pl_ingest(p_load_date, p_run_id)` — không code
 
 ```
-pl_ingest(p_load_date, p_run_id)
-  run_start = utcNow()                                ← upper bound cố định cho cả run
-  Lookup cfg_source_entity (is_active) ⋈ state_watermark
-  ForEach entity (concurrency 4–8)                    ← chỉ Copy, không Spark
-    Switch source_type
-      db   → Copy: SELECT … WHERE updated_at >  wm − lookback
-                              AND updated_at <= run_start
-              → landing/wholesale/<entity>/load_date=<d>/batch=<id>/*.parquet
-      file → Copy (binary): inbound/<source>/<entity>/*  filter LastModified (wm, run_start]
-              → landing/<source>/<entity>/load_date=<d>/batch=<id>/      (source = retail | reference)
-    ghi kết quả copy (rows/files, batch_id) vào biến mảng
-  nb_brz_load(batches = [...])                        ← 1 notebook, runMultiple
-  nb_ops_set_watermark(batches)                       ← CHỈ khi copy + load SUCCESS
+Set variable  run_start = utcNow()                     ← mốc trên cố định cho cả run
+Lookup        meta.cfg_source_entity (is_active) ⋈ meta.state_watermark
+ForEach entity (song song 4–8)
+  Switch source_type
+    db   → Copy: SELECT … FROM dbo.<entity>
+                 [incremental] WHERE updated_at > wm − lookback AND updated_at <= run_start
+           → Files/landing/<source>/<entity>/load_date=<d>/batch=<id>/*.parquet
+    file → Copy (binary): inbound/<source>/<entity>/*  lọc LastModified (wm, run_start]
+           → Files/landing/<source>/<entity>/load_date=<d>/batch=<id>/
+nb_run_layer(layer='brz')                              ← load landing → brz.*
+nb_ops_set_watermark                                   ← CHỈ khi copy + load thành công
 ```
 
-- **Upper bound `run_start`** → dòng commit giữa lúc extract vào run sau, không mất.
-- **Lookback** (vd 2 ngày) → bắt dòng commit trễ; trùng được dedup ở Silver.
-- **Watermark chỉ tiến khi thành công** → run lỗi thì run sau tự lấy lại đúng khoảng (P6).
-- Master nhỏ: `full_snapshot` mỗi ngày → **giữ vĩnh viễn** ở Bronze (nguồn lịch sử duy nhất cho SCD2 — P7).
-- Scale/backfill DB: Copy **partition option = dynamic range** + tăng degree of parallelism.
+### 8.2 `nb_brz_load` — 1 notebook cho mọi entity
 
-### 8.3 `nb_brz_load` (mỗi batch)
-
+Với mỗi batch mới trong landing (đọc từ `cfg_source_entity`):
 1. File: tính checksum → `state_file_manifest`; checksum đã `LOADED` → `DUPLICATE`, bỏ qua.
-2. Đọc: parquet (DB) / CSV `header=True, inferSchema=False` (**all string**), `PERMISSIVE`, `_corrupt_record`.
-3. Thêm metadata (§5.2).
-4. Cột mới so với `schema_registry` → `mergeSchema` + ghi `DETECTED` + alert (không fail).
-5. Ghi `brz_<src>_<entity>` bằng `replaceWhere _batch_id = '<id>'` (idempotent).
-6. Manifest → `LOADED`; log metrics.
+2. Đọc: parquet (db) / CSV `header`, **mọi cột là chuỗi** (file) → temp view.
+3. `DELETE FROM brz.<t> WHERE _batch_id = …` rồi `INSERT INTO brz.<t> SELECT *, <metadata>` → idempotent.
+4. Cột mới chưa có → thêm cột (schema evolution) + ghi `schema_registry` (DETECTED).
 
-### 8.4 Phương án đã cân nhắc (ADR 002)
-
-| Phương án | Khi nào |
-|---|---|
-| Copy job (incremental tự quản lý) | cần ít cấu hình; khó gắn log/manifest/DQ theo chuẩn riêng |
-| Spark streaming `availableNow` + checkpoint | rất nhiều file, cần exactly-once theo file |
-| Shortcut / mirroring | không cần landing copy — không dùng để mô phỏng ingest thật |
+Bronze giữ **mọi thứ** (kể cả dòng bẩn); snapshot master giữ vĩnh viễn (nguồn duy nhất cho lịch sử SCD2).
 
 ---
 
 ## 9. Silver
 
-**Lands:** dữ liệu đã map, cast, chuẩn hoá, dedup, conform giữa 2 nguồn; lỗi → quarantine.
-**Leaves:** bảng sạch theo entity, có `_record_hash`, CDF bật cho bảng Gold cần đọc incremental.
+**Mỗi entity 1 notebook `%%sql`**, cùng khuôn:
 
-### 9.1 Đọc incremental
+```sql
+-- 1. Batch Bronze chưa xử lý (hoặc toàn bộ nếu p_full_reload)
+CREATE OR REPLACE TEMP VIEW src AS SELECT … FROM brz.brz_wholesale_x WHERE _batch_id IN (…)
+UNION ALL SELECT … FROM brz.brz_retail_x  WHERE _batch_id IN (…);
 
-Đọc **batch Bronze chưa xử lý** (`_batch_id` có trong log Bronze SUCCESS, chưa có ở Silver). `p_full_reload` → đọc toàn bộ Bronze.
+-- 2. Làm sạch bằng SQL function + ref mapping
+CREATE OR REPLACE TEMP VIEW cleaned AS
+SELECT clean_code(customer_code) AS customer_code, parse_ts(updated_at) AS updated_at, m.standard_value AS gender, …
+FROM src LEFT JOIN meta.ref_value_mapping m ON m.domain = 'gender' AND m.source_value = upper(trim(src.gender));
 
-### 9.2 Silver generic — `nb_slv_generic(entity)`
-
+-- 3. Dòng lỗi → quarantine ; dòng tốt → dedup (bản mới nhất theo key)
+INSERT INTO slv.quarantine_x SELECT … FROM cleaned WHERE <lỗi>;
+-- 4. MERGE theo business key, chỉ update khi _record_hash đổi
+MERGE INTO slv.slv_x t USING (…dedup…) s ON t.key = s.key
+WHEN MATCHED AND t._record_hash <> s._record_hash THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
 ```
-batches của mọi source_system của entity
-→ apply_mapping(cfg_column_mapping)       đổi tên, cast, transform → schema chuẩn chung
-→ union các nguồn                          (không có if source == …)
-→ dq.validate(ruleset silver)              → ok / quarantine
-→ dedup_latest(business_keys, updated_at)
-→ add_hash(tracked cols)
-→ merge_delta theo cfg_table.load_method   (chỉ update khi hash khác)
-```
 
-Transform được tham chiếu trong mapping (mỗi cái là 1 hàm package, có unit test): `parse_multi_date`, `std_text:{upper|title|trim}`, `map:<domain>` (→ `ref_value_mapping`), `percent`, `to_utc:<source_timezone>`.
+| Bảng | Grain | Điểm riêng |
+|---|---|---|
+| `slv_category` | category_code | dedup `CAT005` (survivorship: chuẩn hoá rồi lấy bản mới nhất) |
+| `slv_product` | product_code | brand chuẩn hoá; wholesale ưu tiên (nguồn master) |
+| `slv_customer` | customer_code | gộp 2 nguồn: survivorship theo cột (ADR 003), `source_flags` |
+| `slv_sales_hierarchy` | source_system, salesman_code | chuẩn hoá position; self-reference → manager NULL |
+| `slv_orders_history` | order_no, product_code, order_status, updated_at | append idempotent (MERGE insert-only) |
+| `slv_orders_current` | order_no, product_code | **PySpark (Q10)**; chỉ update khi `updated_at` mới hơn (chống out-of-order) |
+| `quarantine_<entity>` | — | dòng gốc + `dq_reason`, `_batch_id` |
 
-### 9.3 Bảng Silver
-
-| Bảng | Grain / key | Notebook | Ghi |
-|---|---|---|---|
-| `slv_product` | `product_code` | generic | MERGE (hash) |
-| `slv_category` | `category_code` | generic | MERGE |
-| `slv_sales_hierarchy` | `source_system, salesman_code` | generic + hook chuẩn hoá self-reference | MERGE (snapshot hiện tại) |
-| `slv_customer` | `customer_code` | **đặc thù** `nb_slv_customer`: survivorship 2 nguồn (rule trong config: thuộc tính nào nguồn nào thắng, fallback `updated_at` mới nhất), `source_flags` (`W`/`R`/`WR`) | MERGE |
-| `slv_orders_history` | `order_no, product_code, order_status, updated_at` | generic | MERGE insert-only |
-| `slv_orders_current` | `order_no, product_code` | **đặc thù** `nb_slv_orders_current` (Q10) | MERGE, chỉ update khi `src.updated_at > tgt.updated_at` (chống out-of-order) |
-| `quarantine_<entity>` | — | `dq.quarantine` | append: dòng gốc + `rule_id`, `reason`, `_batch_id` |
-
-> Đề Q10 nói "drop duplicates on order_no" — grain đúng là **order_no + product_code**. Trình bày cả hai và giải thích.
-
-### 9.4 Tối ưu
-
-- Orders: partition `order_month` (hoặc liquid clustering `order_date`) theo `cfg_table`.
-- MERGE có **partition pruning**: thêm `tgt.order_month IN (<tháng trong batch>)`.
-- **Deletion Vectors** bật; **CDF** bật trên `slv_orders_current`, `slv_customer`, `slv_product`, `slv_sales_hierarchy`.
-- Dedup source **trước** MERGE.
+> Q10 nói "drop duplicates on order_no" — grain đúng là **order_no + product_code**; trình bày cả hai.
 
 ---
 
 ## 10. Gold
 
-**Lands:** star schema cho *delivered sales by product, customer, country, sales hierarchy*.
-**Leaves:** semantic model Direct Lake, SQL endpoint cho analyst.
-
-### 10.1 Bảng
-
-| Bảng | Grain | Key | Load | Lý do key |
-|---|---|---|---|---|
-| `gld_d_date` | 1 ngày | `date_key` YYYYMMDD | generate (Q9), mở rộng hằng năm | smart key dễ đọc, partition-friendly |
-| `gld_d_customer` | 1 khách | `customer_sk = xxhash64(customer_code)` | SCD1 (generic `scd1_merge`) | SK tách khỏi code nguồn, có unknown member |
-| `gld_d_product` | 1 sản phẩm (+ category lvl1–4) | `product_sk` | SCD1 | nhất quán, unknown member |
-| `gld_d_salesman` | 1 **phiên bản** của 1 salesman | `salesman_sk = xxhash64(source_system, salesman_code, _valid_from)` | **SCD2** + hierarchy flatten | 1 code nhiều phiên bản |
-| `gld_f_sales_line` | 1 dòng sản phẩm của đơn đã ghi nhận doanh thu (`ref_order_status.is_sales_recognized`) | `order_no, product_code` | MERGE incremental (CDF) | — |
-| `gld_a_sales_month` | tháng × product × customer × salesman | — | replace partition bị ảnh hưởng | tăng tốc báo cáo |
-
-**Measures fact:** `quantity`, `unit_price`, `gross_amount`, `tax_amount`, `net_amount` (+ `discount_amount` sau Q16).
-**FK:** `order_date_key`, `recognized_date_key`, `customer_sk`, `product_sk`, `salesman_sk` (point-in-time), `_source_system`.
-
-### 10.2 Kỹ thuật
-
-- **Unknown / inferred member:** FK không khớp → `-1` + flag; khi master về muộn → tạo inferred member, cập nhật khi master đến.
-- **SCD2 `gld_d_salesman` (Q11)** — `scd2_merge` generic:
-  - so snapshot `slv_sales_hierarchy` với `_is_current` theo `_record_hash`
-  - đổi → đóng dòng cũ (`_valid_to = p_load_date − 1`) + mở dòng mới (`_valid_from = p_load_date`)
-  - biến mất ở nguồn → đóng dòng (nghỉ việc)
-  - **flatten hierarchy tại thời điểm snapshot** (self-join 4 cấp, chặn self-loop) → report point-in-time không cần đệ quy
-  - snapshot đầu tiên `_valid_from = 1900-01-01`
-  - **rebuild được** từ snapshot hằng ngày ở Bronze (P7)
-- **Fact incremental:** đọc CDF `slv_orders_current` từ version trong `state_watermark` → keys thay đổi → build lại → MERGE (đơn bị huỷ sau khi ghi nhận → xoá). SCD2 lookup: `order_date BETWEEN _valid_from AND _valid_to` (broadcast dim).
-- **CDF hết hạn** (version cũ đã bị VACUUM) → tự chuyển sang rebuild các partition bị ảnh hưởng / `p_full_reload` + alert.
-- **Aggregate:** `replaceWhere order_month IN (<tháng có thay đổi>)`.
-
-### 10.3 Tối ưu
-
-Fact: partition `order_month` + Z-order `customer_sk, product_sk` (hoặc liquid clustering), **V-Order**, OPTIMIZE sau load lớn. Dim: không partition, V-Order.
-
----
-
-## 11. Log & observability
-
-```
-log_pipeline_run      1 dòng / lần chạy pl_master_daily        (run_id)
- └── log_task_run     1 dòng / step / entity                    (task_id)
-      ├── state_file_manifest
-      ├── dq_result_log
-      └── recon_result
-```
-
-**`log_task_run`:** `task_id, run_id, p_load_date, layer, step_id, source_system, entity, target_table, notebook, load_mode (incremental|full), watermark_from, watermark_to, rows_read, rows_inserted, rows_updated, rows_deleted, rows_rejected, rows_deduped, status (RUNNING|SUCCESS|FAILED|SKIPPED), error_message, started_at, ended_at, duration_sec, delta_version`
-
-- Số insert/update/delete lấy từ `operationMetrics` của Delta history — không đếm lại.
-- `delta_version` → rollback bằng `RESTORE TABLE … VERSION AS OF`.
-- Ghi `RUNNING` khi bắt đầu, cập nhật khi kết thúc (try/finally). Task `RUNNING` quá timeout → alert.
-- Một hàm duy nhất trong package (P4); log append/MERGE theo `task_id`, không ghi đè.
-
-**Alert** (1 thông báo tổng hợp / run, tránh spam): run FAILED · DQ critical · freshness trễ · recon lệch · task treo.
-
----
-
-## 12. Data quality & reconciliation
-
-### 12.1 `cfg_dq_rule` (YAML → bảng)
-
-`rule_id, layer, table_name, check_type, column_name, expression, threshold_pct, severity (critical|warning), action (reject|quarantine|flag|alert), is_active, description`
-
-| check_type | Ví dụ |
-|---|---|
-| `not_null` · `unique` | business key |
-| `fk_exists` | `orders.customer_code → slv_customer` |
-| `range` | `quantity > 0`, `price > 0`, `tax_rate BETWEEN 0 AND 0.2` |
-| `accepted_values` | `order_status ∈ ref_order_status` |
-| `parsable` / `regex` | ngày parse được, `customer_code ~ CUS\d{3}` |
-| `freshness` | batch hôm nay đã về |
-| `volume` | count trong ±50% trung bình 7 ngày |
-| `schema` | không có cột chưa đăng ký |
-| `scd2_no_overlap` | khoảng hiệu lực không chồng lấp |
-
-### 12.2 Theo layer (tối thiểu)
-
-| Layer | Rule | On failure |
-|---|---|---|
-| Bronze | freshness theo entity | alert |
-| Bronze | header khớp registry | mergeSchema + DETECTED + alert |
-| Bronze | volume bất thường | alert |
-| Silver | business key not null & unique | quarantine |
-| Silver | qty > 0, price > 0, ngày parse được, status hợp lệ | quarantine |
-| Silver | FK tồn tại | flag (→ `-1` ở Gold) |
-| Gold | fact không trùng grain, không FK NULL | critical → dừng |
-| Gold | SCD2 không chồng lấp | critical → dừng |
-| Gold | tổng doanh thu Gold = Silver | critical → dừng + alert |
-
-### 12.3 Engine
-
-`dq.validate()` sinh SQL từ rule, chạy **trên batch hiện tại** (không quét toàn bảng) → tách ok / bad → ghi `dq_result_log(run_id, rule_id, table, checked_rows, failed_rows, fail_pct, status, sample_keys, executed_at)` (MERGE theo `run_id, rule_id`) → `critical` FAIL → raise.
-
-### 12.4 Reconciliation
-
-`recon_result(run_id, check_name, left_layer, right_layer, left_count, right_count, left_amount, right_amount, diff, status)`
-
-- Source → Bronze: rows Copy = rows Bronze theo batch.
-- Bronze → Silver: `bronze = silver_new + quarantined + deduped`.
-- Silver → Gold: tổng `net_amount` doanh thu theo tháng.
-- Gold → Semantic model: DAX query qua semantic-link so với SQL.
-
----
-
-## 13. Orchestration
-
-### 13.1 `pl_master_daily(p_load_date = hôm qua theo business_timezone)`
-
-```
-nb_ops_run_start                     run_id, log_pipeline_run
-→ pl_ingest                          Copy (ForEach) → nb_brz_load → watermark
-→ nb_run_layer(layer='silver')       DAG từ cfg_pipeline_step → runMultiple (1 session)
-→ nb_run_layer(layer='gold')         dims → facts → aggregates
-→ nb_ops_recon
-→ Semantic model refresh (sm_sales)
-→ nb_ops_run_end → notify (tóm tắt)
-On failure (mọi bước) → nb_ops_run_end(FAILED) → notify
-```
-
-- **`nb_run_layer`** đọc `cfg_pipeline_step` → dựng DAG `runMultiple` (dependencies, timeout, retry) → DQ chạy bên trong từng step. Thêm bảng = thêm step trong YAML (P2).
-- Pipeline lo thứ tự giữa các layer, retry (2 lần/60s), timeout, alert; Spark lo song song trong layer.
-- Lịch: simulator 05:00 → master 06:00 → maintenance (tuần) 02:00 CN.
-
-### 13.2 `pl_backfill(p_from, p_to, p_mode)`
-
-- `daily`: ForEach ngày **tuần tự** gọi `pl_master_daily` (giữ thứ tự watermark/SCD2).
-- `rebuild`: `p_full_reload=True` → rebuild Silver/Gold từ Bronze theo partition tháng, song song theo tháng.
-
-### 13.3 Idempotency từng bước
-
-| Bước | Cơ chế |
-|---|---|
-| Copy DB | upper bound cố định; watermark chỉ tiến khi thành công |
-| Copy file | LastModified window + manifest checksum |
-| Bronze | `replaceWhere _batch_id` |
-| Silver | dedup + MERGE theo business key, điều kiện `updated_at` / hash |
-| Gold SCD2 | so hash; cùng `p_load_date` chạy lại không tạo version mới |
-| Gold fact / agg | MERGE theo grain / replace partition |
-| Log / DQ / recon | MERGE theo `task_id` / `(run_id, rule_id)` |
-
----
-
-## 14. Semantic model & report
-
-- `sm_sales`: **Direct Lake** trên schema `gld` của `lh_platform`; star schema; `gld_d_date` mark as date table; ẩn SK & cột kỹ thuật.
-- Measures (định nghĩa 1 lần, display folder rõ ràng): `Sales`, `Qty`, `Tax`, `Net Sales`, `Sales LY`, `YoY %`, `MTD/QTD/YTD`, `Top N Customer`, `Avg Order Value`; sau Q16 `Discount`, `Net After Discount`. Fact chỉ chứa doanh thu đã ghi nhận → DAX không lọc status (P3, P4).
-- Hierarchy point-in-time qua `salesman_sk` → DAX không cần logic thời gian.
-- (tuỳ chọn) RLS theo hierarchy.
-- `rpt_sales`: Overview · Product · Customer/Country · Sales hierarchy.
-- `sm_ops` + `rpt_pipeline_health` (trên schema `meta`): run status, duration, rows/ngày, DQ trend, freshness, recon.
-- Tối ưu Direct Lake: V-Order, OPTIMIZE, chỉ cột cần, aggregate table, theo dõi fallback DirectQuery.
-- Power BI Free xem được report trong workspace có Fabric capacity (trial).
-
----
-
-## 15. Performance & scale playbook
-
-### 15.1 Thuộc tính bảng (khai báo trong `cfg_table`)
-
-| Bảng | Partition / cluster | V-Order | DV | CDF | OPTIMIZE | VACUUM |
-|---|---|---|---|---|---|---|
-| `brz_*_orders` | `_ingest_date` | ✗ | — | ✗ | tuần | 7 ngày |
-| `brz_*` master | — | ✗ | — | ✗ | tuần | 7 ngày (data giữ vĩnh viễn) |
-| `slv_orders_history` | `order_month` | ✗ | ✓ | ✗ | ngày | 7 ngày |
-| `slv_orders_current` | `order_month` | ✗ | ✓ | ✓ | ngày | ≥ 7 ngày (> max downtime) |
-| `slv_*` master | — | ✗ | ✓ | ✓ | tuần | ≥ 7 ngày |
-| `gld_f_sales_line` | `order_month` + Z-order `customer_sk, product_sk` | ✓ | ✓ | ✗ | sau load | 7 ngày |
-| `gld_d_*`, `gld_a_*` | — | ✓ | — | — | sau load | 7 ngày |
-
-### 15.2 Đọc (Q12 — query)
-
-Partition pruning · data skipping (Z-order / liquid clustering) · V-Order + OPTIMIZE (file ~128MB–1GB) · aggregate table · broadcast dim nhỏ · filter trước join · không `SELECT *`.
-
-### 15.3 Ghi (Q12 — write)
-
-Chỉ xử lý delta (watermark → batch → CDF) · MERGE có pruning predicate · Deletion Vectors · optimized write / auto-compaction · tránh over-partition (không partition theo ngày khi < 1GB/ngày, không theo cột cardinality cao) · Native Execution Engine · resource profile theo layer (write-heavy Bronze/Silver, read-heavy Gold) · AQE · backfill song song theo tháng · 1 Spark session / layer (`runMultiple`, high concurrency).
-
-### 15.4 Drill scale (bằng số thật)
-
-SF=1000 → vài chục–vài trăm triệu dòng, đo:
-1. Query sales/tháng: trước vs sau partition + Z-order + V-Order.
-2. MERGE 1 ngày vào fact: có vs không pruning predicate.
-3. Số file/kích thước trước vs sau OPTIMIZE.
-4. Thời gian `pl_master_daily`: N notebook riêng vs `runMultiple`.
-
----
-
-## 16. Vận hành, bảo trì & phục hồi
-
-| Việc | Cách làm | Tần suất |
-|---|---|---|
-| OPTIMIZE / VACUUM | `pl_maintenance` → `nb_ops_maintenance` đọc `cfg_table` | theo lịch trong config |
-| Monitoring | Monitoring hub + `rpt_pipeline_health` | hằng ngày |
-| Alert | §11 | real-time |
-| Capacity | Fabric Capacity Metrics app (CU, throttling) | hằng tuần |
-| Rollback bảng | `RESTORE TABLE … VERSION AS OF <delta_version>` | sự cố |
-| Rebuild layer | `pl_backfill(mode=rebuild)` từ Bronze | sự cố / thay đổi logic |
-| Runbook | `docs/runbook.md`: triệu chứng → kiểm tra → xử lý | cập nhật liên tục |
-
-**Thứ tự debug chuẩn** (dùng cho Q15): report → semantic refresh → Gold (`DESCRIBE HISTORY`, `log_task_run`) → Silver → Bronze → `state_watermark` / `state_file_manifest` → Copy output → Source.
-
----
-
-## 17. Scenario drills
-
-| Drill | Chuẩn bị | Hệ thống xử lý | Bằng chứng |
+| Bảng | Grain | Key | Load |
 |---|---|---|---|
-| **Q14** late-arriving | ngày 2026-01-15 insert đơn `order_date = 2026-01-02` | watermark `updated_at` bắt được; fact MERGE vào partition tháng 1; aggregate tháng 1 rebuild; SCD2 lookup theo `order_date` | log, recon, report tháng 1 |
-| **Q15** mất tháng 5 | xoá partition tháng 5 ở Gold / làm hỏng watermark | thứ tự debug §16 → `RESTORE` hoặc `pl_backfill 2026-05-01..31` | timeline + recon |
-| **Q16** schema evolution | `nb_00_sim_schema_v2` từ 2026-06-01 | Bronze mergeSchema → registry DETECTED → PR: migration + mapping + APPROVED → Silver/Gold có cột, lịch sử NULL (không backfill giả) → measure mới | PR, registry, report |
-| **Q11** SCD2 | đổi org chart giữa tháng 3 | version mới; fact point-in-time | report team tháng 3 đúng cơ cấu cũ |
-| **Q12** scale | SF=1000 | §15.4 | bảng số liệu |
-| Rebuild | xoá Silver + Gold | `pl_backfill(mode=rebuild)` | kết quả = trước khi xoá |
-| File lỗi | `sim_scenario` | DUPLICATE / quarantine / alert | log |
+| `gld_d_date` | 1 ngày | `date_key` YYYYMMDD | **PySpark (Q9)**, generate; `ref_holiday_vn`, fiscal year từ tháng 7 |
+| `gld_d_customer` | 1 khách | `customer_sk = xxhash64(customer_code)` | SCD1 `MERGE` |
+| `gld_d_product` | 1 sản phẩm (+ category lvl1–4) | `product_sk` | SCD1 `MERGE` |
+| `gld_d_salesman` | 1 **phiên bản** salesman | `xxhash64(source, code, _valid_from)` | **SCD2** + hierarchy flatten (Q7, Q11) |
+| `gld_f_sales_line` | 1 dòng sản phẩm của đơn đã ghi nhận doanh thu | order_no, product_code | `MERGE` incremental theo đơn thay đổi |
+| `gld_a_sales_month` | tháng × product × customer × salesman | — | xoá-chèn các tháng thay đổi |
+
+- **Unknown member `-1`** ở mọi dim → fact không có FK NULL; orphan được gắn cờ.
+- **SCD2 (Q11):** nguồn chỉ có trạng thái hiện tại → mỗi ngày so snapshot với bản `_is_current` theo `_record_hash`; đổi → đóng bản cũ (`_valid_to = p_load_date − 1`) + mở bản mới; flatten salesman → team lead → manager → director **tại thời điểm snapshot** → report không cần đệ quy. Rebuild được từ snapshot Bronze.
+- **Fact** chỉ chứa doanh thu đã ghi nhận (`ref_order_status.is_sales_recognized`), lookup salesman **point-in-time** theo `order_date`.
 
 ---
 
-## 18. Roadmap
+## 11. Orchestration, log, DQ, recon
 
-**Chiến lược: lát cắt dọc trước, mở rộng bằng config sau.** Entity `orders` đi xuyên Source → Report trước; entity thứ 2 trở đi phải **không cần code mới** — nếu cần, framework sai và sửa framework.
-
-### Phase 0 — Foundation (1 ngày)
-- [x] 3 workspace (đổi "Prob" → "Prod")
-- [ ] Gỡ extension VS Code; xoá `.stubs/ .vfscache/ .vfsmeta/ .work-folder-info`
-- [ ] Git integration (§3.1); branch protection `main`
-- [ ] Source: `sqldb_erp_wholesale`, `lh_retail_drop`; Platform-Dev: `lh_platform` (schema-enabled; schema `brz`, `slv`, `gld`, `meta`), `env_common`, `vl_config`, connection tới SQL DB
-- [ ] Repo skeleton (§3.2), `README`, `docs/conventions.md` (= §1, §4, §5)
-- [ ] Package skeleton + CI (`lint`, `unit`, `build`) chạy xanh
-- [ ] `nb_setup_migrate`, `nb_setup_config`; `V001__meta.sql`
-
-**DoD:** wheel build từ CI, gắn vào `env_common`, notebook `import companya_de` chạy được; commit Fabric → GitHub → Update Prod với 1 item thử.
-
-### Phase 1 — Discovery: profiling & DQ scan (Q1) (1 ngày)
-- [ ] `sandbox/nb_profiling` (không commit) → `docs/dq_findings.md`: issue | bảng/cột | dòng mẫu | loại | query detect | xử lý | rule_id
-- [ ] Từ findings: viết `column_mapping.yml`, `dq_rule.yml`, `ref_*.yml` bản đầu
-
-**DoD:** mỗi issue có query detect + cách xử lý + rule/mapping tương ứng.
-
-### Phase 2 — Simulator tối thiểu (1 ngày)
-- [ ] DDL ERP (PK/FK/index), `nb_00_sim_setup`, `nb_00_sim_seed`
-- [ ] `nb_00_sim_daily` chế độ **replay**
-- [ ] Schedule 05:00
-
-**DoD:** 7 ngày replay → nguồn tăng đúng; reject log có dòng vi phạm FK.
-
-### Phase 3 — Vertical slice: orders end-to-end (3 ngày)
-- [ ] Package: `env`, `config`, `io`, `transforms`, `keys`, `dq` (cơ bản), `logging`, `runner` + unit test
-- [ ] `pl_ingest` (cả db & file) + `nb_brz_load`
-- [ ] `nb_slv_generic` cho orders → `slv_orders_history`; `nb_slv_orders_current`
-- [ ] Gold tối thiểu: `gld_d_date`, dims chỉ có unknown member + code, `gld_f_sales_line`
-- [ ] `nb_run_layer`, `pl_master_daily` (bản đầu), log + DQ cơ bản + recon
-- [ ] `sm_sales` tối thiểu: 1 trang Sales by month/product
-- [ ] Idempotency test
-
-**DoD:** 7 ngày liên tục chạy tự động; rerun 1 ngày không đổi; số report = SQL. **Tag `v0.1`.**
-
-### Phase 4 — Breadth: mọi entity bằng config (2 ngày)
-- [ ] Thêm product, category, hierarchy, customer **chỉ bằng YAML** (kiểm chứng S3)
-- [ ] `nb_slv_customer` (survivorship — ADR 003)
-- [ ] Gold dims SCD1 đầy đủ (`scd1_merge`)
-
-**DoD:** PR thêm entity không chạm `src/` (trừ survivorship); recon xanh.
-
-### Phase 5 — Gold đầy đủ (2 ngày)
-- [ ] `scd2_merge` + `nb_gld_d_salesman` (flatten, chặn self-loop) — Q7, Q11
-- [ ] `gld_d_date` đầy đủ (Q9) + `ref_holiday_vn`, `ref_fiscal`
-- [ ] Fact incremental bằng CDF + fallback khi CDF hết hạn
-- [ ] `gld_a_sales_month`
-- [ ] ADR 001 (Gold model — Q3/Q4)
-
-**DoD:** rebuild full == incremental; SCD2 không chồng lấp; không FK NULL.
-
-### Phase 6 — DQ, recon & alert đầy đủ (1 ngày)
-- [ ] Rule đủ §12.2; recon 4 cặp; alert tổng hợp
-
-**DoD:** lỗi bơm từ simulator → log đúng; critical dừng pipeline.
-
-### Phase 7 — Orchestration hardening (1 ngày)
-- [ ] `pl_backfill` (daily / rebuild), `pl_maintenance`, timeout/retry, task treo
-- [ ] `nb_ops_test_idempotency`, `nb_ops_test_rebuild`
-- [ ] CI: `config`, `check_hardcode`, `check_orphans`, `check_outputs`
-
-**DoD:** CI đầy đủ xanh; rebuild từ Bronze == hiện trạng.
-
-### Phase 8 — Semantic model & report (1 ngày)
-- [ ] `sm_sales` đầy đủ measures, `rpt_sales`; `sm_ops` + `rpt_pipeline_health`; (RLS)
-
-**DoD:** report = SQL Q5 = recon.
-
-### Phase 9 — Release Prod (½ ngày)
-- [ ] PR `dev → main` → Update Prod → `nb_setup_migrate` + `nb_setup_config` → `pl_backfill` → schedule
-- [ ] **Tag `v1.0`**
-
-**DoD:** Prod chạy độc lập theo lịch.
-
-### Phase 10 — Simulator nâng cao + drills (2 ngày)
-- [ ] `generate` + vòng đời status + `scale_factor` + bơm lỗi + `nb_00_sim_master_change`
-- [ ] Drills §17 → `docs/runbook.md`; golden test
-- [ ] **Tag `v1.1`**
-
-### Phase 11 — SQL answers (1 ngày)
-- [ ] `q05` (+ breakdown theo loại lỗi, mỗi điều kiện 1 câu giải thích), `q06` (`DENSE_RANK`), `q07` (recursive CTE chặn self-loop), `q17` (review)
-- [ ] (optional) Part II Q18–Q22
-
-### Phase 12 — Deliverable (1 ngày)
-- [ ] PPT theo thứ tự câu hỏi: trả lời → bằng chứng → link repo
-- [ ] Diagram: kiến trúc (Q2), ERD Gold (Q3), DAG, lineage
-- [ ] README hoàn chỉnh
-
-### Timeline
+### 11.1 Pipeline
 
 ```
-P0  P1  P2  P3  P4  P5  P6  P7  P8  P9  P10 P11 P12
-1   1   1   3   2   2   1   1   1   ½   2   1   1     ≈ 17.5 ngày công
+pl_master_daily(p_load_date)
+  nb_ops_run_start            → log_pipeline_run STARTED
+  pl_ingest                   → Copy + nb_run_layer('brz') + watermark
+  nb_run_layer('slv')
+  nb_run_layer('gld')
+  nb_ops_recon
+  refresh sm_sales
+  nb_ops_run_end              → log + thông báo (Teams/Outlook)
+  (on failure) nb_ops_run_end(FAILED) → thông báo
+
+pl_backfill(p_from, p_to)     → lặp ngày gọi pl_master_daily (tuần tự)
+pl_sim_drive(p_days)          → [Source] nb_00_sim_daily → pl_master_daily(p_load_date = exit value)
+pl_maintenance                → OPTIMIZE / VACUUM theo lịch
 ```
 
-| Milestone | Sau | Tag |
-|---|---|---|
-| Lát cắt dọc orders chạy hằng ngày | P3 | `v0.1` |
-| Mọi entity + Gold đầy đủ | P5 | `v0.5` |
-| Release Prod | P9 | `v1.0` |
-| Drills + scale | P10 | `v1.1` |
+### 11.2 `nb_run_layer(layer)` — runner duy nhất (Python mỏng)
 
-**Nếu gấp:** giữ P0–P3, P5 (SCD2), P11, P12; P4 chỉ customer + product; bỏ CDF (replace partition theo tháng); bỏ Prod (tag trên `main`); P10 chỉ Q14 + Q15.
+1. Đọc `meta.cfg_pipeline_step` của layer → DAG (`depends_on`).
+2. Chạy các notebook bằng `notebookutils.notebook.runMultiple` (1 Spark session, song song theo DAG).
+3. Quanh mỗi bước: ghi `log_task_run` (RUNNING → SUCCESS/FAILED), lấy số dòng từ Delta history bảng đích, chạy DQ rule của bảng đó (`cfg_dq_rule`), ghi `dq_result_log`; rule `critical` FAIL → dừng.
+
+→ Notebook nghiệp vụ chỉ có SQL; thêm bảng = thêm notebook + 1 dòng `cfg_pipeline_step`.
+
+### 11.3 DQ (Q8, Q13)
+
+| Layer | Rule tối thiểu | Khi fail |
+|---|---|---|
+| Bronze | file/batch đã về (freshness) · header đúng · số dòng bất thường | alert |
+| Silver | key not null & unique · qty > 0, price > 0, ngày parse được, status hợp lệ | quarantine |
+| Silver | FK tồn tại | flag (→ `-1` ở Gold) |
+| Gold | fact không trùng grain, không FK NULL · SCD2 không chồng lấp · tổng Gold = Silver | dừng + alert |
+
+### 11.4 Recon
+
+Source → Bronze (rows Copy = rows Bronze) · Bronze → Silver (`in = out + quarantine + dedup`) · Silver → Gold (tổng doanh thu/tháng) · Gold → report (DAX query).
 
 ---
 
-## 19. Mapping câu hỏi → phần
+## 12. Semantic model & report
 
-| Q | Nội dung | Phần |
-|---|---|---|
-| Q1 | DQ scan | P1, `dq_findings.md` |
-| Q2 | Pipeline medallion | §2, §8–10 |
-| Q3 | Schema Gold | §10.1, ADR 001 |
-| Q4 | Loading strategy | §8–10, §13.3 |
-| Q5–Q7 | SQL | P11, `sql/answers/` |
-| Q8 | DQ per layer | §12.2 |
-| Q9 | dim_date | §10.1, `nb_gld_d_date` |
-| Q10 | Silver orders | §9.3 |
-| Q11 | SCD2 hierarchy | §10.2 |
-| Q12 | Scale | §15 |
-| Q13 | DQ automation | §11, §12.3 |
-| Q14–Q16 | Late data / backfill / schema evolution | §17, §16 |
-| Q17 | Code review | P11 |
-| Q18–Q22 | Forecast FIFO (optional) | P11 |
+- `sm_sales`: **Direct Lake** trên `gld.*`; star schema; date table; ẩn SK/cột kỹ thuật.
+- Measures: Sales, Qty, Net Sales, Sales LY, YoY %, MTD/YTD, Top N Customer (+ Discount sau Q16).
+- `rpt_sales`: Overview · Product · Customer/Country · Sales hierarchy (point-in-time).
+- `rpt_pipeline_health` (trên `meta.*`): trạng thái run, thời gian, rows/ngày, DQ, recon.
 
 ---
 
-## 20. Rủi ro & ADR
+## 13. Performance & vận hành
 
-### 20.1 Rủi ro
-
-| # | Rủi ro | Giảm thiểu |
+| Bảng | Partition / cluster | Ghi chú |
 |---|---|---|
-| R1 | Phạm vi lớn → làm dở dang | lát cắt dọc trước, milestone có tag, kế hoạch "nếu gấp" |
-| R2 | Trial capacity giới hạn CU → drill scale bị throttle | SF lớn chạy ngoài giờ; đo tương đối |
-| R3 | Default lakehouse trỏ sai môi trường | `env.paths()` + Variable Library (§3.4) |
-| R4 | Data thật ≠ mô tả đề (format ngày ngược, `created_at` vs `inserted_at`, products retail > wholesale) | ghi nhận ở Q1; xử lý bằng mapping/config |
-| R5 | Grain orders (`order_no` vs `order_no + product_code`) | dùng grain đúng, giải thích ở Q10 |
-| R6 | Mất lịch sử hierarchy nếu Gold hỏng | snapshot Bronze giữ vĩnh viễn; SCD2 rebuild được (P7) |
-| R7 | CDF hết hạn khi dừng lâu | fallback tự động sang rebuild partition + alert |
-| R8 | Framework quá phức tạp so với lợi ích | P15: chỉ trừu tượng hoá khi có ≥ 2 nơi dùng; kiểm chứng bằng S3 |
-| R9 | Cập nhật wheel vào Environment mất thời gian | gom thay đổi package theo đợt; version rõ ràng |
-| R10 | Một số tính năng Fabric (liquid clustering, resource profile, SQL Database) khác nhau theo runtime/trial | Đã xác nhận: workspace chạy **Runtime 2.0 (Spark 4.1, Delta 4.2, Python 3.13)**, SQL Database dùng được. Spark 4 bật **ANSI mặc định** → luôn dùng `try_cast` / `try_to_timestamp` khi parse dữ liệu bẩn |
+| `brz_*_orders` | `_ingest_date` | append |
+| `slv_orders_*` | `order_month` | MERGE có điều kiện partition (pruning) |
+| `gld_f_sales_line` | `order_month` + Z-order `customer_sk, product_sk` | V-Order cho Direct Lake |
+| dim / master | không partition | nhỏ |
 
-### 20.2 ADR dự kiến
+- **Q12 — đọc:** partition pruning, Z-order / liquid clustering, V-Order + OPTIMIZE, aggregate table.
+- **Q12 — ghi:** chỉ xử lý phần thay đổi, MERGE có pruning, Deletion Vectors, optimized write, không over-partition.
+- **Vận hành:** `pl_maintenance` (OPTIMIZE/VACUUM), Monitoring hub + `rpt_pipeline_health`, rollback `RESTORE TABLE … VERSION AS OF <delta_version trong log>`.
+- **Thứ tự debug (Q15):** report → refresh → Gold history → Silver → Bronze → watermark/manifest → Copy output → Source.
+
+---
+
+## 14. Scenario drills
+
+| Drill | Làm | Bằng chứng |
+|---|---|---|
+| **Q14** late-arriving | 15/01 chèn đơn `order_date = 02/01` | watermark bắt được, partition tháng 1 cập nhật, recon khớp |
+| **Q15** mất tháng 5 | xoá partition tháng 5 ở Gold | runbook debug → `RESTORE` hoặc `pl_backfill` |
+| **Q16** schema evolution | thêm `discount_amount` từ 01/06 | Bronze thêm cột → registry → DDL Silver/Gold → measure mới |
+| **Q11** SCD2 | đổi org chart giữa tháng 3 | report team tháng 3 đúng cơ cấu cũ |
+| **Q12** scale | sinh dữ liệu lớn | số đo trước/sau tối ưu |
+
+---
+
+## 15. Roadmap từng bước
+
+> Mỗi bước nhỏ, xong → kiểm → bước tiếp. Lát cắt dọc **orders** chạy được trước, mở rộng sau.
+
+| Bước | Việc | Xong khi |
+|---|---|---|
+| **0. Nền** | `lh_platform` · `nb_setup_ddl` (schema + bảng meta) · `nb_setup_config` (cfg/ref) · `nb_common` (SQL function) · **spike** (§17.2) | bảng meta có dữ liệu config; SQL function gọi được từ `%%sql` |
+| **1. Khám phá (Q1)** | `docs/dq_findings.md` — liệt kê lỗi + query phát hiện (chạy trên Bronze/Source) | mỗi lỗi có query + cách xử lý + rule |
+| **2. Ingest** | connection SQL DB · `pl_ingest` · `nb_brz_load` · watermark/manifest | chạy 2 lần cùng ngày → Bronze không đổi |
+| **3. Orders end-to-end** | `slv_orders_*` · Gold tối thiểu (`gld_d_date`, dim chỉ unknown member, `gld_f_sales_line`) · `nb_run_layer` · log · DQ cơ bản · 1 trang report | 7 ngày giả lập chạy tự động; **tag `v0.1`** |
+| **4. Master** | customer, product, category, hierarchy (Silver + Gold SCD1) | recon xanh |
+| **5. SCD2 + Gold đủ** | `gld_d_salesman` (Q7, Q11), `gld_a_sales_month` | SCD2 không chồng lấp |
+| **6. DQ + recon đủ** | rule §11.3, recon §11.4, thông báo | lỗi bơm vào bị bắt đúng |
+| **7. Vận hành** | `pl_backfill`, `pl_maintenance`, `pl_sim_drive`, kiểm idempotency/rebuild | chạy lại & rebuild ra cùng kết quả |
+| **8. Report** | `sm_sales`, `rpt_sales`, `rpt_pipeline_health` | report = SQL = recon |
+| **9. Prod** | PR `dev → main`, Prod Update, setup, backfill | **tag `v1.0`** |
+| **10. Drill** | simulator nâng cao + drill §14 + runbook | **tag `v1.1`** |
+| **11. SQL đề** | `sql/answers/` Q5, Q6, Q7, Q17 (+ Part II) | |
+| **12. Nộp bài** | PPT, diagram, README | |
+
+---
+
+## 16. Mapping câu hỏi → phần
+
+| Q | Phần | Q | Phần |
+|---|---|---|---|
+| Q1 | Bước 1, `dq_findings.md` | Q10 | §9 `slv_orders_current` (PySpark) |
+| Q2 | §2, §8–10 | Q11 | §10 SCD2 |
+| Q3, Q4 | §10, §8–9, ADR 001 | Q12 | §13 |
+| Q5–Q7 | `sql/answers/` | Q13 | §6, §11 |
+| Q8 | §11.3 | Q14–Q16 | §14 |
+| Q9 | §10 `gld_d_date` (PySpark) | Q17 | `sql/answers/q17` |
+
+---
+
+## 17. Rủi ro, spike cần kiểm chứng & ADR
+
+### 17.1 Rủi ro
+
+| Rủi ro | Giảm thiểu |
+|---|---|
+| Làm dở dang | lát cắt dọc orders trước; từng bước nhỏ |
+| Trial capacity giới hạn (đã gặp `TooManyRequestsForCapacity`) | 1 phiên Spark mỗi lúc; runner dùng chung session |
+| Data thật ≠ mô tả đề | ghi nhận ở Q1, xử lý ở Silver |
+| Notebook Git sync / conflict | quy tắc §3 |
+| Runtime 2.0 (Spark 4.1, ANSI bật) | luôn `try_cast`, `try_to_timestamp` với dữ liệu bẩn |
+
+### 17.2 Spike — kiểm ngay ở Bước 0 (quyết định cách làm)
+
+| # | Cần biết | Nếu không được |
+|---|---|---|
+| K1 | Spark 4.1 trên Fabric có **SQL function** (`CREATE TEMPORARY FUNCTION … RETURN <biểu thức>`) | đăng ký cùng tên bằng Python UDF trong `nb_common` (SQL gọi y hệt) |
+| K2 | `%%configure` default lakehouse theo **tên** chạy được, kể cả notebook con trong `runMultiple` | gắn lakehouse trong runner, notebook con kế thừa session |
+| K3 | Định dạng Git của cell `%%sql` | tạo 1 notebook mẫu trên UI → Commit → xem file |
+| K4 | Pipeline Lookup đọc `meta.*` của lakehouse; Copy đọc Fabric SQL DB | dùng notebook nhỏ thay Lookup |
+
+### 17.3 ADR
 
 | ADR | Chủ đề |
 |---|---|
-| 001 | Gold model: grain, key, load method (Q3/Q4) |
-| 002 | Ingest: Copy activity + notebook load (vs Copy job / streaming / shortcut) |
-| 003 | Customer survivorship giữa 2 nguồn |
-| 004 | Surrogate key tất định bằng hash |
-| 005 | Config as code (YAML trong package) vs bảng sửa tay |
-| 006 | Partition vs liquid clustering cho orders |
-| 007 | Git sync theo workspace vs `fabric-cicd` |
-| 008 | ERP giả lập "hybrid" (ép timestamp/PK, giữ giá trị bẩn, FK NOCHECK) vs strict vs raw; `categories` là file `reference` |
-| 009 | Virtual clock cho simulator (initial load tới 2025-12-31, replay theo ngày giả lập) vs đồng hồ thật |
-| 010 | 1 lakehouse `lh_platform` + schema theo layer (`brz`/`slv`/`gld`/`meta`) vs 1 lakehouse mỗi layer |
+| 001 | Gold model: grain, key, cách load (Q3/Q4) |
+| 003 | Survivorship customer giữa 2 nguồn |
+| 008 | ERP giả lập "hybrid"; `categories` là file `reference` |
+| 009 | Virtual clock cho simulator |
+| 010 | 1 lakehouse `lh_platform` + schema theo layer |
+| 011 | **SQL-first**: Spark SQL cho biến đổi; Python chỉ cho runner/ingest generic/Q9/Q10; bỏ wheel/Docker/unit test Python (bản lưu: nhánh `archive/python-framework`) |
