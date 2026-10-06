@@ -419,6 +419,7 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 - **Replay** mỗi lần tiến `p_days` (mặc định 1): 2026-01-01 → ~2026-05-10, ~130 ngày, median ~62 dòng/ngày/nguồn (retail 1 file/ngày).
 - Kịch bản đề rơi vào giai đoạn replay: Q14 (02/01 → 15/01/2026) ✅; Q15 (05/2026) chỉ có 1–10/05 từ seed; Q16 (01/06/2026) cần **generate**.
 - `p_sim_date` = nhảy tới đúng ngày (tua nhanh); exit value = ngày giả lập mới → `p_load_date` cho Platform. `pl_sim_drive(p_days)` lặp: sim 1 ngày → `pl_master_daily(p_load_date)`.
+- **Idempotency:** chạy lại sau lỗi → cùng cửa sổ (state chỉ tiến ở bước cuối), mọi ghi đều lặp được (MERGE · DELETE+INSERT 1 transaction · file trùng tên · log `replaceWhere window_to`). Gọi `p_days` nhiều lần = đồng hồ tiến nhiều lần (chủ đích). **Quy ước: pipeline luôn truyền `p_sim_date` cụ thể** → retry cùng ngày là no-op. Không chạy 2 phiên `nb_00_sim_daily` song song (không có lock; lịch/pipeline đảm bảo tuần tự).
 - Hết seed (~05/2026) → chuyển sang generate (7.4) — cần làm trước drill Q15/Q16.
 
 ### 7.3 Notebook

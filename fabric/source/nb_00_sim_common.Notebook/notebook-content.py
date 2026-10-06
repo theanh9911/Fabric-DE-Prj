@@ -370,6 +370,12 @@ def write_window_log(df: DataFrame, table: str, window_to: dt.date) -> None:
         writer.mode("overwrite").save(path)
 
 
+REJECT_LOG_SCHEMA = (
+    "sim_run_id string, source_system string, entity string, window_from date, window_to date, "
+    "reason string, row_json string, logged_at timestamp"
+)
+
+
 def reject_log_df(rejected: DataFrame, sim_run_id: str, source: str, entity: str,
                   window_from: dt.date, window_to: dt.date) -> DataFrame:
     return rejected.select(

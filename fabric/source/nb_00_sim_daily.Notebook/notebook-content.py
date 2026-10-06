@@ -169,11 +169,11 @@ release_log = spark.createDataFrame(
 ).withColumn("logged_at", F.current_timestamp())
 write_window_log(release_log, "sim_release_log", window_to)
 
-if reject_dfs:
-    reject_log = reject_dfs[0]
-    for df in reject_dfs[1:]:
-        reject_log = reject_log.unionByName(df)
-    write_window_log(reject_log, "sim_reject_log", window_to)
+# Luôn ghi (kể cả rỗng) → replaceWhere xoá log cũ của cửa sổ này khi chạy lại
+reject_log = spark.createDataFrame([], REJECT_LOG_SCHEMA)
+for df in reject_dfs:
+    reject_log = reject_log.unionByName(df)
+write_window_log(reject_log, "sim_reject_log", window_to)
 
 # State chỉ tiến khi mọi bước phía trên thành công
 set_released_until(window_to, sim_run_id)
