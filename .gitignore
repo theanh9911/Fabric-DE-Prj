@@ -1,0 +1,38 @@
+# --- Fabric VS Code extension (auto-generated, local only) ---
+.stubs/
+.vfscache/
+.vfsmeta/
+.work-folder-info
+
+# --- Editor / OS ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# --- Python / Jupyter ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# --- Secrets / local config ---
+.env
+*.env
+secrets/
+*.pem
+
+# --- Local scratch / outputs ---
+tmp/
+scratch/
+*.log
+
+DE Assignment/
