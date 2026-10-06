@@ -1,9 +1,0 @@
-name: companya-de
-
-services:
-  test:
-    build: .
-    image: companya-de-test
-    volumes:
-      - ./:/app          # code mount trực tiếp → sửa code không cần build lại image
-    command: pytest
