@@ -109,7 +109,7 @@ _WORKSPACE_ID = notebookutils.runtime.context["currentWorkspaceId"]
 
 @lru_cache(maxsize=None)
 def _lakehouse_id(lakehouse: str) -> str:
-    return fabric.resolve_item_id(lakehouse, type="Lakehouse", workspace=_WORKSPACE_ID)
+    return fabric.resolve_item_id(lakehouse, item_type="Lakehouse", workspace=_WORKSPACE_ID)
 
 
 def lakehouse_path(lakehouse: str, sub_path: str) -> str:
