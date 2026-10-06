@@ -16,7 +16,10 @@
 # - **Dùng:** notebook nghiệp vụ gọi `%run nb_common` ngay sau cell parameters. Không có `%%configure` ở đây (notebook gọi lo).
 # - Hàm là `TEMPORARY` → sống trong Spark session hiện tại; chạy lại `%run` thì định nghĩa lại, không lỗi.
 # - **Chuỗi rỗng / `"NULL"` dạng chữ → NULL** ở mọi hàm.
-# # | Hàm | Trả về | Làm gì |
+
+# MARKDOWN ********************
+
+# | Hàm | Trả về | Làm gì |
 # |---|---|---|
 # | `clean_text(s)` | STRING | trim, gộp khoảng trắng thừa |
 # | `clean_code(s)` | STRING | bỏ mọi khoảng trắng, viết HOA (mã khách, mã SP…) |
