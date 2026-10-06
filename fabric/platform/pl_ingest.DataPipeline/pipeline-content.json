@@ -1,0 +1,158 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "SetVariable",
+        "typeProperties": {
+          "variableName": "v_run_start",
+          "value": {
+            "value": "@utcNow('yyyy-MM-dd HH:mm:ss')",
+            "type": "Expression"
+          }
+        },
+        "policy": {
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "set_run_start",
+        "dependsOn": []
+      },
+      {
+        "type": "Lookup",
+        "typeProperties": {
+          "source": {
+            "type": "LakehouseTableSource",
+            "sqlReaderQuery": "SELECT e.source_system, e.entity, e.source_type, e.source_object,\n       e.watermark_column, e.lookback_days,\n       COALESCE(w.watermark_value, '1900-01-01 00:00:00') AS watermark_value\nFROM meta.cfg_source_entity e\nLEFT JOIN meta.state_watermark w\n       ON w.step = 'ingest' AND w.source_system = e.source_system AND w.entity = e.entity\nWHERE e.is_active = 1\nORDER BY e.load_order\n",
+            "partitionOption": "None"
+          },
+          "datasetSettings": {
+            "type": "LakehouseTable",
+            "typeProperties": {
+              "schema": "meta",
+              "table": "cfg_source_entity"
+            },
+            "schema": [],
+            "connectionSettings": {
+              "name": "lh_platform",
+              "properties": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "artifactId": "c2894c06-25c7-8659-4078-fe4279063a99",
+                  "workspaceId": "00000000-0000-0000-0000-000000000000",
+                  "rootFolder": "Tables"
+                },
+                "externalReferences": {
+                  "connection": "94873c5f-283f-4da4-b9fa-7bfbf4ecfa18"
+                },
+                "annotations": []
+              }
+            },
+            "annotations": []
+          },
+          "firstRowOnly": false
+        },
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "lkp_source_entity",
+        "dependsOn": [
+          {
+            "activity": "set_run_start",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "isSequential": false,
+          "batchCount": 4,
+          "items": {
+            "value": "@activity('lkp_source_entity').output.value",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "Switch",
+              "typeProperties": {
+                "on": {
+                  "value": "@item().source_type",
+                  "type": "Expression"
+                },
+                "cases": [
+                  {
+                    "value": "db",
+                    "activities": [
+                      {
+                        "type": "Wait",
+                        "typeProperties": {
+                          "waitTimeInSeconds": 1
+                        },
+                        "name": "wait_todo_db",
+                        "dependsOn": []
+                      }
+                    ]
+                  },
+                  {
+                    "value": "file",
+                    "activities": [
+                      {
+                        "type": "Wait",
+                        "typeProperties": {
+                          "waitTimeInSeconds": 1
+                        },
+                        "name": "wait_todo_file",
+                        "dependsOn": []
+                      }
+                    ]
+                  }
+                ],
+                "defaultActivities": [
+                  {
+                    "type": "Fail",
+                    "typeProperties": {
+                      "message": {
+                        "value": "@concat('Unknown source_type: ', item().source_type, ' (', item().source_system, '.', item().entity, ')')",
+                        "type": "Expression"
+                      },
+                      "errorCode": "UNKNOWN_SOURCE_TYPE"
+                    },
+                    "name": "fail_unknown_source_type",
+                    "dependsOn": []
+                  }
+                ]
+              },
+              "name": "sw_source_type",
+              "dependsOn": []
+            }
+          ]
+        },
+        "name": "fe_source_entity",
+        "dependsOn": [
+          {
+            "activity": "lkp_source_entity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "p_load_date": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "v_run_start": {
+        "type": "String"
+      }
+    }
+  }
+}
