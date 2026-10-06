@@ -14,6 +14,7 @@
 # # nb_common
 # - **Mục đích:** định nghĩa **1 lần** các hàm làm sạch dùng chung (P4) dưới dạng SQL function → gọi được trong mọi cell `%%sql`.
 # - **Dùng:** notebook nghiệp vụ gọi `%run nb_common` ngay sau cell parameters. Không có `%%configure` ở đây (notebook gọi lo).
+# - **Dùng từ Silver trở đi.** Landing và Bronze luôn giữ nguyên dữ liệu gốc — không làm sạch, không parse.
 # - Hàm là `TEMPORARY` → sống trong Spark session hiện tại; chạy lại `%run` thì định nghĩa lại, không lỗi.
 # - **Chuỗi rỗng / `"NULL"` dạng chữ → NULL** ở mọi hàm.
 
