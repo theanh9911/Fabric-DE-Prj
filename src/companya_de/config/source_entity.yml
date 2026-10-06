@@ -1,0 +1,76 @@
+# Nguồn dữ liệu Platform ingest — Git là nguồn sự thật; nb_setup_config đồng bộ vào meta.cfg_source_entity.
+# Thêm entity / nguồn mới = thêm khối ở đây (P2), không viết code.
+#
+# source_type:     db (đọc bằng query) | file (đọc file trong drop zone)
+# load_type:       incremental (chỉ phần mới) | full_snapshot (mỗi lần là toàn bộ trạng thái hiện tại)
+# watermark_type:  column (db incremental, lọc theo cột) | file_modified (mọi nguồn file, lọc theo LastModified)
+# source_object:   db → schema.table ; file → thư mục trong drop zone của Source
+
+sources:
+  wholesale:
+    source_type: db
+    source_timezone: UTC                # ERP lưu timestamp UTC
+    entities:
+      customers:
+        source_object: dbo.customers
+        load_type: full_snapshot        # nguồn chỉ giữ trạng thái hiện tại → snapshot hằng ngày (giữ vĩnh viễn ở Bronze, P7)
+        business_keys: [customer_code]
+        load_order: 10
+      products:
+        source_object: dbo.products
+        load_type: full_snapshot
+        business_keys: [product_code]
+        load_order: 10
+      sales_hierarchy:
+        source_object: dbo.sales_hierarchy
+        load_type: full_snapshot
+        business_keys: [salesman_code]
+        load_order: 10
+      orders:
+        source_object: dbo.orders
+        load_type: incremental
+        watermark_type: column
+        watermark_column: updated_at
+        lookback_days: 2                # bắt dòng commit trễ; trùng lặp dedup ở Silver
+        business_keys: [order_no, product_code, order_status, updated_at]
+        load_order: 20
+
+  retail:
+    source_type: file
+    source_timezone: Asia/Ho_Chi_Minh   # file không ghi múi giờ → coi là giờ địa phương
+    entities:
+      customers:
+        source_object: inbound/retail/customers
+        load_type: full_snapshot        # mỗi file là snapshot đầy đủ
+        watermark_type: file_modified
+        business_keys: [customer_code]
+        load_order: 10
+      products:
+        source_object: inbound/retail/products
+        load_type: full_snapshot
+        watermark_type: file_modified
+        business_keys: [product_code]
+        load_order: 10
+      sales_hierarchy:
+        source_object: inbound/retail/sales_hierarchy
+        load_type: full_snapshot
+        watermark_type: file_modified
+        business_keys: [salesman_code]
+        load_order: 10
+      orders:
+        source_object: inbound/retail/orders
+        load_type: incremental          # mỗi file là các dòng mới của 1 ngày
+        watermark_type: file_modified
+        business_keys: [order_no, product_code, order_status, updated_at]
+        load_order: 20
+
+  reference:
+    source_type: file
+    source_timezone: Asia/Ho_Chi_Minh
+    entities:
+      categories:
+        source_object: inbound/reference/categories
+        load_type: full_snapshot
+        watermark_type: file_modified
+        business_keys: [category_code]
+        load_order: 5

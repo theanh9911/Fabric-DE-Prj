@@ -1,0 +1,8 @@
+# Thiết lập chung của Platform (giống nhau ở Dev và Prod).
+# Giá trị KHÁC theo môi trường → Variable Library, không để ở đây.
+
+# Lakehouse duy nhất của Platform; notebook gắn làm default lakehouse theo tên (%%configure)
+lakehouse: lh_platform
+
+# Ngày nghiệp vụ (order_date, date_key, p_load_date mặc định) tính theo múi giờ này
+business_timezone: Asia/Ho_Chi_Minh

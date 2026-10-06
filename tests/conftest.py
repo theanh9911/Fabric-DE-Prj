@@ -23,3 +23,29 @@ def spark(tmp_path_factory):
     session = build_spark(str(tmp_path_factory.mktemp("warehouse")))
     yield session
     session.stop()
+
+
+@pytest.fixture(scope="session")
+def migrated(spark):
+    """Catalog local đã áp dụng toàn bộ migration — giống lh_platform sau nb_setup_migrate."""
+    from companya_de.migrate import apply_migrations
+
+    apply_migrations(spark)
+    return spark
+
+
+@pytest.fixture
+def ctx():
+    from companya_de.config import PlatformSettings
+    from companya_de.env import new_run_context
+
+    return new_run_context("2026-01-02", "testrun", settings=PlatformSettings("lh_platform", "Asia/Ho_Chi_Minh"))
+
+
+@pytest.fixture
+def table_name(spark):
+    """Tên bảng duy nhất cho mỗi test trong schema `test`."""
+    import uuid
+
+    spark.sql("CREATE SCHEMA IF NOT EXISTS test")
+    return f"test.t_{uuid.uuid4().hex[:8]}"

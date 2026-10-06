@@ -14,6 +14,7 @@ dev = [
     "delta-spark==4.2.0",
     "pytest>=8",
     "ruff>=0.6",
+    "tzdata>=2026.5",
 ]
 
 [build-system]
