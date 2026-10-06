@@ -33,7 +33,9 @@ Khai báo trong `nb_ops_recon`; kết quả vào `meta.reconciliation_result` v�
 
 | Phép đối soát | Grain | Tolerance |
 |---|---|---|
-| Source ↔ Bronze: số dòng trong cửa sổ (Copy rowsRead vs Bronze) | batch | 0 |
+| Source ↔ Bronze — **db**: Copy `rowsRead` vs số dòng Bronze của batch | batch | 0 |
+| Source ↔ Bronze — **file**: Copy `filesWritten` vs số file trong `ingestion_batch` (COMMITTED + SKIPPED_DUPLICATE); mọi file COMMITTED parse được. Số dòng file chỉ có sau parse (`bronze_row_count`) — Binary copy **không** có `rowsRead` | batch | 0 |
+| Freshness: mỗi entity có dòng `ingestion_batch` trong lượt (kể cả `NO_NEW_DATA`); retail orders phải có file mỗi ngày | lượt | — |
 | Bronze → Silver: `vào = ra + quarantine + bỏ do dedup` | batch | 0 |
 | Silver ↔ Gold: số đơn, số dòng, tổng `gross_amount` đã ghi nhận | ngày, tháng | 0 |
 | Gold ↔ aggregate tháng | tháng | 0 |

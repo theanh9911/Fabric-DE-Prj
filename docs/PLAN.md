@@ -69,6 +69,10 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 | D11 | Chốt partition/Z-order/V-Order trước | **Đo rồi mới tối ưu**; Liquid Clustering là ứng viên | design/09 §5 |
 | D12 | RESTORE luôn được | Phụ thuộc retention; VACUUM có kiểm | design/09 §4 |
 | D13 | Nguyên tắc tuyệt đối | Quyết định có điều kiện (§3) | |
+| D14 | `batch_id` vừa là khoá dòng log vừa là định danh dữ liệu | `ingestion_batch_id` = 1 lần thử (khoá); `batch_id` + `landing_path` = dữ liệu được replay (ổn định khi rerun) | design/04 §2 |
+| D15 | Cửa sổ ERP so `updated_at` (giờ giả lập) với `run_start` (giờ thật) | **Mỗi cửa sổ chỉ dùng một đồng hồ:** ERP cận trên = cuối ngày `p_load_date` (đồng hồ nguồn); file theo giờ thật. Múi giờ chỉ ảnh hưởng Silver | design/01 §4, 03 §2 |
+| D16 | Recon Source↔Bronze bằng `rowsRead` cho mọi nguồn | db: `rowsRead`; file Binary: **số file** (không có `rowsRead`); số dòng file chỉ sau parse | design/03 §8, 08 §3 |
+| D17 | File gửi lại có thể lọt khỏi cửa sổ | Hợp đồng: gửi lại = ghi đè (LastModified mới). Ingest file lookback 1 ngày + dedup **hash nội dung**; LastModified cũ hơn lookback = vi phạm hợp đồng | design/01, 03 §5 |
 
 ---
 
@@ -186,7 +190,8 @@ Scenario `bad_rows`, `missing_file`, `file_resend`, `duplicate_file`, `partial_f
 | Capacity trial nhỏ (lỗi 430) | 1 phiên Spark mỗi lúc; `runMultiple`; `pipeline_run` ghi 1 lần cuối lượt |
 | SQL endpoint đồng bộ trễ → Lookup đọc watermark cũ khi chạy liên tiếp | Rerun/idempotent nên chỉ lấy dư; nếu đo thấy vấn đề → control tables sang Fabric SQL Database (design/04) |
 | `%%configure` lỗi trong high-concurrency session | Tắt HC cho notebook; spike K6 |
-| Không lấy được metadata file nguồn | Spike K5 (Copy session log / Get Metadata) |
+| Không lấy được metadata file nguồn | Spike K5 (Copy session log / Get Metadata); dedup không phụ thuộc vì dùng hash nội dung |
+| Lấy output Copy từng entity trong ForEach cho recon | Spike K7 (Append variable / Copy log) |
 | Pipeline không tự lưu | Ctrl+S mỗi activity; Commit sớm |
 | Runtime 2.0 bật ANSI | `try_cast`, `try_to_timestamp` |
 
@@ -200,6 +205,6 @@ Scenario `bad_rows`, `missing_file`, `file_resend`, `duplicate_file`, `partial_f
 | 009 | Virtual clock cho simulator |
 | 010 | 1 lakehouse `lh_platform` + schema theo layer |
 | 011 | SQL-first; bỏ framework Python (nhánh `archive/python-framework`) |
-| 012 | Ingest bằng pipeline Copy; ba chiến lược theo loại nguồn (design/03) |
+| 012 | Ingest bằng pipeline Copy; ba chiến lược theo loại nguồn; mỗi cửa sổ một đồng hồ (design/03) |
 | 013 | Logic ở code, config ở bảng khi runtime cần (design/06 §2) |
-| 014 | Control tables: watermark hiện hành + ingestion_batch lịch sử; normal/rerun/reprocess (design/03–04) |
+| 014 | Control tables: watermark hiện hành + `ingestion_batch` (lần thử ≠ dữ liệu replay); normal/rerun/reprocess (design/03–04) |

@@ -21,7 +21,7 @@
 | Cập nhật | Thêm dòng mới; dòng cũ không sửa (theo seed) |
 | Xoá | Không hard delete trong vận hành bình thường |
 | Cột thay đổi | `updated_at` NOT NULL, có index → dùng làm watermark |
-| Thời gian | `updated_at` là **giờ giả lập** (virtual clock), không có múi giờ — **múi giờ: còn mở** |
+| Thời gian | `updated_at` theo **đồng hồ của ERP** = virtual clock trong mô phỏng; không lưu múi giờ. Ở ngày giả lập D, mọi dòng ERP có `updated_at < D + 1 ngày` (trừ dòng lỗi năm 2027) — đây là cận trên Platform dùng. Múi giờ (UTC hay VN) chỉ ảnh hưởng việc đổi sang UTC ở Silver — **chốt ở EDA** |
 | Tần suất | Liên tục; ~62 dòng / ngày giả lập |
 | Lỗi đã biết | status sai chính tả · qty âm/lẻ · tax dạng chữ · orphan `CUS099`/`PRD999` · `updated_at` năm 2027 |
 
@@ -41,8 +41,9 @@
 |---|---|
 | File | Lần đầu `orders_history_until_YYYYMMDD.csv`; sau đó **1 file / ngày** `orders_YYYYMMDD.csv` (dòng có `updated_at` trong ngày) |
 | Grain, khoá | như wholesale orders (không có `order_line_id`) |
-| Gửi lại | Có thể gửi lại cùng tên (ghi đè) → phải nhận ra là **phiên bản mới của file** |
-| Hoàn tất | File được ghi 1 lần (atomic rename trong simulator); hệ thật có thể đang ghi dở → cần biên an toàn |
+| Gửi lại | Gửi lại = **ghi đè cùng tên**. Storage gán LastModified = thời điểm ghi; nguồn **không** giữ thời gian sửa cũ → file gửi lại luôn có LastModified mới. File đến với LastModified cũ hơn 1 ngày là **vi phạm hợp đồng** (Platform không đảm bảo nhận) |
+| Hoàn tất | File được ghi 1 lần (atomic rename trong simulator); hệ thật có thể đang ghi dở → Platform chờ 5 phút sau LastModified (settle) |
+| Thời gian | LastModified là **giờ thật UTC** của storage (khác đồng hồ dữ liệu bên trong file) |
 | Thời gian | Không múi giờ → coi là **Asia/Ho_Chi_Minh** |
 
 ### customers / products / sales_hierarchy (retail) · categories (reference)
@@ -57,11 +58,20 @@
 - Chuỗi rỗng và chữ `NULL` đều có thể xuất hiện, nghĩa là "không có giá trị".
 - Platform **chỉ đọc**; không bao giờ ghi vào nguồn.
 
+## 4. Hai đồng hồ — đừng trộn
+
+| Đồng hồ | Gồm | Dùng cho |
+|---|---|---|
+| **Đồng hồ nguồn** (virtual clock) | `updated_at`, `order_date`… bên trong dữ liệu; `p_load_date` | Cửa sổ ERP incremental, watermark ERP, ngày nghiệp vụ |
+| **Giờ thật UTC** | LastModified của file; `run_start`; `*_at_utc` trong log | Cửa sổ file, watermark file, log vận hành |
+
+Mọi điều kiện so sánh chỉ dùng giá trị **cùng một đồng hồ**.
+
 ## Quyết định
-- Master ERP: full snapshot mỗi ngày. Orders ERP: incremental theo `updated_at` + lookback.
-- File: chép nguyên bản, nhận diện file bằng `(path, size, modified_at)`; checksum để giai đoạn sau.
+- Master ERP: full snapshot mỗi ngày. Orders ERP: incremental theo `updated_at` + lookback; cận trên = cuối ngày `p_load_date` (đồng hồ nguồn).
+- File: chép nguyên bản; cửa sổ theo LastModified (giờ thật) + lookback 1 ngày; nhận file trùng bằng **hash nội dung**.
 
 ## Còn mở
-- **Múi giờ của `updated_at` ERP:** DDL ERP mặc định `sysutcdatetime()` (gợi ý UTC), nhưng giá trị seed là giờ gốc của file. EDA (Bước 2) xem phân bố giờ trong ngày rồi chốt.
+- **Múi giờ của `updated_at` ERP** (chỉ ảnh hưởng Silver): DDL ERP mặc định `sysutcdatetime()` gợi ý UTC, nhưng giá trị seed là giờ gốc của file. EDA (Bước 2) xem phân bố giờ trong ngày rồi chốt.
 - Khoá sự kiện orders có duy nhất không (`order_no, product_code, order_status, updated_at`) — EDA.
 - Tên cột chính xác của từng file retail/categories — EDA.

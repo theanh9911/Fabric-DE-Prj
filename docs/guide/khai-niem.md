@@ -43,8 +43,16 @@
 | Từ | Nghĩa | Ví dụ |
 |---|---|---|
 | `run_id` | 1 lượt chạy pipeline | RunId của Fabric |
-| `batch_id` | 1 entity (hoặc 1 file) trong 1 lượt | `retail_orders_20260102_ab12` |
+| `ingestion_batch_id` | 1 dòng log = 1 lần thử ingest 1 entity / 1 file | uuid |
+| `batch_id` | **Dữ liệu** của 1 entity trong 1 lượt normal — rerun giữ nguyên để replay | `retail_orders_20260102_ab12cd34` |
 | `load_date` | Ngày logic (giả lập) của lượt chạy | `2026-01-02` |
+
+## Hai đồng hồ — đừng trộn
+
+| Đồng hồ | Gồm | Dùng cho |
+|---|---|---|
+| **Đồng hồ nguồn** (virtual clock) | `updated_at`, `order_date` trong dữ liệu; `p_load_date` | Cửa sổ & watermark ERP, ngày nghiệp vụ |
+| **Giờ thật UTC** | LastModified của file; `run_start`; `*_at_utc` trong log | Cửa sổ & watermark file, log vận hành |
 
 ## Layer
 

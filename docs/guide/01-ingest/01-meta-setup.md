@@ -21,22 +21,22 @@
 
 | source_system | entity | load_strategy | source_object | watermark_column | lookback_min | settle_min | source_timezone | business_keys | load_order |
 |---|---|---|---|---|---|---|---|---|---|
-| reference | categories | file_new_or_changed | `inbound/reference/categories` | | | 5 | Asia/Ho_Chi_Minh | category_code | 10 |
+| reference | categories | file_new_or_changed | `inbound/reference/categories` | | 1440 | 5 | Asia/Ho_Chi_Minh | category_code | 10 |
 | wholesale | customers | db_full_snapshot | `dbo.customers` | | | | *(EDA chốt)* | customer_code | 20 |
 | wholesale | products | db_full_snapshot | `dbo.products` | | | | *(EDA chốt)* | product_code | 20 |
 | wholesale | sales_hierarchy | db_full_snapshot | `dbo.sales_hierarchy` | | | | *(EDA chốt)* | salesman_code | 20 |
-| retail | customers | file_new_or_changed | `inbound/retail/customers` | | | 5 | Asia/Ho_Chi_Minh | customer_code | 20 |
-| retail | products | file_new_or_changed | `inbound/retail/products` | | | 5 | Asia/Ho_Chi_Minh | product_code | 20 |
-| retail | sales_hierarchy | file_new_or_changed | `inbound/retail/sales_hierarchy` | | | 5 | Asia/Ho_Chi_Minh | salesman_code | 20 |
+| retail | customers | file_new_or_changed | `inbound/retail/customers` | | 1440 | 5 | Asia/Ho_Chi_Minh | customer_code | 20 |
+| retail | products | file_new_or_changed | `inbound/retail/products` | | 1440 | 5 | Asia/Ho_Chi_Minh | product_code | 20 |
+| retail | sales_hierarchy | file_new_or_changed | `inbound/retail/sales_hierarchy` | | 1440 | 5 | Asia/Ho_Chi_Minh | salesman_code | 20 |
 | wholesale | orders | db_incremental | `dbo.orders` | updated_at | 1440 | | *(EDA chốt)* | order_no,product_code | 50 |
-| retail | orders | file_new_or_changed | `inbound/retail/orders` | | | 5 | Asia/Ho_Chi_Minh | order_no,product_code | 50 |
+| retail | orders | file_new_or_changed | `inbound/retail/orders` | | 1440 | 5 | Asia/Ho_Chi_Minh | order_no,product_code | 50 |
 
 ## Làm
 
 **C — Claude viết vào repo:**
 1. `nb_setup_ddl` v4: cell xoá bảng bỏ (chỉ chạy được khi bảng tồn tại — `DROP TABLE IF EXISTS`), cell tạo 5 bảng trên.
 2. `nb_setup_config` v4: 1 MERGE cho `cfg_source_entity` như bảng trên; bỏ các cell `ref_*`.
-3. `nb_common`: bỏ phần nhắc `ref_value_mapping` (function `std_*` viết ở Bước 2).
+   (`nb_common` không đổi ở bước này; function `std_*` viết ở Bước 2.)
 
 **B — Bạn trên Fabric (ws Dev):**
 1. Đóng mọi tab notebook → Source control → **Update all**.

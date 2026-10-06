@@ -31,6 +31,7 @@ Partition: không partition lúc đầu (dữ liệu nhỏ). Xem lại ở bài 
 ## 3. Idempotent
 - Ghi theo batch: `DELETE WHERE _batch_id = X` rồi append.
 - **Rerun** đọc lại đúng thư mục landing của batch đã COMMITTED và **giữ nguyên `batch_id`** → xoá rồi ghi lại đúng phần đó → Bronze y hệt. `ingestion_batch` thêm 1 dòng `run_mode = rerun` trỏ cùng `batch_id`.
+- File có `content_hash` trùng một file đã COMMITTED (gửi lại y hệt, bản copy khác tên, file lấy lại do lookback) → **không ghi Bronze**, `ingestion_batch.status = SKIPPED_DUPLICATE`.
 - Bước ghi Bronze + `ingestion_batch` COMMITTED + `watermark_state` theo thứ tự đó; lỗi giữa chừng → watermark chưa tiến → lần sau lấy lại.
 
 ## 4. Schema drift
