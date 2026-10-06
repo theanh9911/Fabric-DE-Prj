@@ -13,6 +13,11 @@ Mọi file cùng khuôn:
 4. **Kết quả mong đợi** — nhìn thấy gì là đúng.
 5. **Lỗi đã gặp** — lỗi thật đã gặp ở dự án này + cách sửa.
 
+## Đọc trước
+
+- [source.md](source.md) — Source là gì, dữ liệu đến từ đâu, virtual clock, dữ liệu bẩn.
+- [khai-niem.md](khai-niem.md) — từ điển thuật ngữ.
+
 ## Lộ trình
 
 | Bước | Thư mục | Trạng thái |
