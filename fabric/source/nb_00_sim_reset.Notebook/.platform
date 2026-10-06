@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "nb_00_sim_reset",
+    "description": "Empty the Source (ERP data, inbound files, simulator state) to replay from scratch"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "e4d66e20-2ad5-4af4-969e-78e15c9dfd7d"
+  }
+}

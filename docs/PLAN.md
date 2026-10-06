@@ -393,7 +393,7 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 
 | Item | Thiết kế |
 |---|---|
-| `sqldb_erp_wholesale` | Fabric SQL Database, mô hình **hybrid** (ADR 008): ép `datetime2` UTC, PK, NOT NULL trên key; giữ nguyên giá trị bẩn (status, tax_rate, tên…); FK **khai báo nhưng NOCHECK**. `orders` có `order_line_id` IDENTITY làm PK (append theo status) + **index `updated_at`**. Schema `sim.stg_*` = staging nội bộ simulator. DDL: `sql/source/erp_wholesale_bootstrap.sql` (sau khi Git sync → SQL project là nguồn sự thật). |
+| `sqldb_erp_wholesale` | Fabric SQL Database, mô hình **hybrid** (ADR 008): ép `datetime2` UTC, PK, NOT NULL trên key; giữ nguyên giá trị bẩn (status, tax_rate, tên…); FK **khai báo nhưng NOCHECK**. `orders` có `order_line_id` IDENTITY làm PK (append theo status) + **index `updated_at`**. Schema `sim.stg_*` = staging nội bộ simulator. DDL: SQL project `fabric/source/sqldb_erp_wholesale.SQLDatabase/` (Git sync) là nguồn sự thật — thay đổi schema sửa trên DB rồi Commit. |
 | `lh_retail_drop` | chỉ `Files/inbound/<entity>/` — CSV giữ nguyên byte dữ liệu gốc (free-form). |
 | `lh_sim` | nội bộ simulator: `Files/seed/` (9 CSV đề bài), `seed_<src>_<entity>`, `sim_state`, `sim_release_log`, `sim_reject_log`. Platform **không** đọc. |
 
