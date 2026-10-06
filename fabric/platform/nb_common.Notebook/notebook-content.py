@@ -16,8 +16,7 @@
 # - **Dùng:** notebook nghiệp vụ gọi `%run nb_common` ngay sau cell parameters. Không có `%%configure` ở đây (notebook gọi lo).
 # - Hàm là `TEMPORARY` → sống trong Spark session hiện tại; chạy lại `%run` thì định nghĩa lại, không lỗi.
 # - **Chuỗi rỗng / `"NULL"` dạng chữ → NULL** ở mọi hàm.
-#
-# | Hàm | Trả về | Làm gì |
+# # | Hàm | Trả về | Làm gì |
 # |---|---|---|
 # | `clean_text(s)` | STRING | trim, gộp khoảng trắng thừa |
 # | `clean_code(s)` | STRING | bỏ mọi khoảng trắng, viết HOA (mã khách, mã SP…) |
@@ -49,7 +48,7 @@
 # MAGIC CREATE OR REPLACE TEMPORARY FUNCTION clean_text(s STRING) RETURNS STRING
 # MAGIC RETURN CASE WHEN upper(trim(s)) IN ('', 'NULL') THEN NULL
 # MAGIC             ELSE regexp_replace(trim(s), '\\s+', ' ') END;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE OR REPLACE TEMPORARY FUNCTION clean_code(s STRING) RETURNS STRING
 # MAGIC RETURN CASE WHEN upper(trim(s)) IN ('', 'NULL') THEN NULL
 # MAGIC             ELSE upper(regexp_replace(s, '\\s+', '')) END;
@@ -103,7 +102,7 @@
 # MAGIC                 try_to_timestamp(trim(s), 'M/d/yyyy'),
 # MAGIC                 try_to_timestamp(trim(s), 'd/M/yyyy')
 # MAGIC             ) END;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE OR REPLACE TEMPORARY FUNCTION parse_date(s STRING) RETURNS DATE
 # MAGIC RETURN CAST(parse_ts(s) AS DATE);
 

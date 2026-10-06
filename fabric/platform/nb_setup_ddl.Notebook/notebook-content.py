@@ -72,7 +72,7 @@
 # MAGIC     load_order       INT     COMMENT 'nhỏ chạy trước (master trước orders)',
 # MAGIC     is_active        BOOLEAN
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.cfg_pipeline_step (
 # MAGIC     layer         STRING         COMMENT 'brz / slv / gld',
 # MAGIC     step          STRING         COMMENT 'tên bước, duy nhất trong layer',
@@ -82,7 +82,7 @@
 # MAGIC     timeout_sec   INT,
 # MAGIC     is_active     BOOLEAN
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.cfg_dq_rule (
 # MAGIC     rule_id         STRING,
 # MAGIC     layer           STRING,
@@ -116,13 +116,13 @@
 # MAGIC     is_final             BOOLEAN,
 # MAGIC     is_sales_recognized  BOOLEAN  COMMENT 'true = tính doanh thu'
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.ref_value_mapping (
 # MAGIC     domain          STRING  COMMENT 'gender / position / order_status / brand / country …',
 # MAGIC     source_value    STRING  COMMENT 'upper(trim(giá trị nguồn))',
 # MAGIC     standard_value  STRING
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.ref_holiday_vn (
 # MAGIC     holiday_date  DATE,
 # MAGIC     holiday_name  STRING
@@ -151,7 +151,7 @@
 # MAGIC     run_id           STRING,
 # MAGIC     updated_at       TIMESTAMP
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC -- append-only: trạng thái hiện tại của 1 file = sự kiện mới nhất
 # MAGIC CREATE TABLE IF NOT EXISTS meta.state_file_manifest (
 # MAGIC     file_id        STRING     COMMENT 'hash(path)',
@@ -189,7 +189,7 @@
 # MAGIC     message    STRING,
 # MAGIC     event_at   TIMESTAMP
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.log_task_run (
 # MAGIC     task_id        STRING,
 # MAGIC     run_id         STRING,
@@ -204,7 +204,7 @@
 # MAGIC     started_at     TIMESTAMP,
 # MAGIC     ended_at       TIMESTAMP
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.dq_result_log (
 # MAGIC     run_id        STRING,
 # MAGIC     rule_id       STRING,
@@ -214,7 +214,7 @@
 # MAGIC     status        STRING     COMMENT 'PASS / FAIL',
 # MAGIC     event_at      TIMESTAMP
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.recon_result (
 # MAGIC     run_id        STRING,
 # MAGIC     check_name    STRING,
@@ -227,7 +227,7 @@
 # MAGIC     status        STRING     COMMENT 'PASS / FAIL',
 # MAGIC     event_at      TIMESTAMP
 # MAGIC ) USING DELTA;
-# MAGIC
+# MAGIC 
 # MAGIC CREATE TABLE IF NOT EXISTS meta.schema_registry (
 # MAGIC     table_name   STRING,
 # MAGIC     column_name  STRING,
