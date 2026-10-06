@@ -154,7 +154,7 @@ Fabric-DE-Prj/
 │       ├── pipeline_step.yml  dq_rule.yml
 │       └── ref_order_status.yml  ref_value_mapping.yml  ref_holiday_vn.yml
 ├── tests/
-│   ├── unit/                       pytest + pyspark local
+│   ├── unit/                       pytest + Spark/Delta trong Docker
 │   └── golden/                     số liệu kỳ vọng cho simulator seed cố định
 ├── migrations/                     V001__meta.sql, V002__silver.sql, …  (P11)
 ├── tools/                          check_hardcode.py · check_orphans.py · check_outputs.py
@@ -194,7 +194,7 @@ tag vX.Y
 | Job | Làm gì | Fail khi |
 |---|---|---|
 | `lint` | ruff trên `src/`, `tests/`, `fabric/**/notebook-content.py` | lỗi lint |
-| `unit` | pytest + pyspark local | test fail |
+| `unit` | pytest trong cùng image Docker với local (Java 21, Python 3.13, Spark 4.1.1, Delta 4.2.0) | test fail |
 | `config` | validate YAML theo schema (pydantic): key tồn tại, mapping đủ cột key, rule tham chiếu bảng có thật | config sai |
 | `check_hardcode` | quét code cell: GUID, `abfss://`, `onelake.dfs`, literal nghiệp vụ trong danh sách cấm (`'Delivered'`, …) | tìm thấy |
 | `check_orphans` | notebook không thuộc `cfg_pipeline_step`/pipeline và không thuộc nhóm `setup`/`ops`/`sim` | có mồ côi |
@@ -266,7 +266,7 @@ except Exception as e:
 
 | Tầng | Công cụ | Nội dung |
 |---|---|---|
-| Unit | pytest + pyspark local | transforms, keys, scd1/scd2, merge idempotent, mapping, dq rule → SQL |
+| Unit | pytest + Spark/Delta trong Docker (`docker compose run --rm test`) | transforms, keys, scd1/scd2, merge idempotent, mapping, dq rule → SQL |
 | Config | pydantic schema | YAML hợp lệ, tham chiếu chéo đúng |
 | Data | DQ engine | mỗi run, mỗi layer |
 | Idempotency | `nb_ops_test_idempotency` | chạy 1 ngày 2 lần → so `count` + checksum từng bảng |

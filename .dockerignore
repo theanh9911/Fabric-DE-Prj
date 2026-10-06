@@ -1,0 +1,12 @@
+.git
+.venv
+.stubs
+.vfscache
+.vfsmeta
+.work-folder-info
+.vscode
+DE Assignment
+fabric
+docs
+**/__pycache__
+**/.pytest_cache
