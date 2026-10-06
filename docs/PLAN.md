@@ -3,6 +3,7 @@
 > Mô phỏng 1 dự án Data Engineering thật trên Microsoft Fabric, dựa trên đề *Data Engineer Case Study*.
 > Làm việc trên **Fabric web UI** + **Git (GitHub)**. Hướng **SQL-first**: biến đổi dữ liệu bằng Spark SQL; Python chỉ là "keo dán".
 > Trạng thái: **Source ✅ xong · Platform: Bước 0 ✅ → Bước 1 Ingest** (xem §15) · Cập nhật: 2026-10-06
+> Thao tác chi tiết từng bước (click-by-click, kết quả mong đợi, lỗi đã gặp): **[docs/guide/](guide/README.md)**.
 
 ---
 
@@ -277,8 +278,11 @@ ForEach entity (song song 4–8)
            → Files/landing/<source>/<entity>/load_date=<d>/batch=<id>/*.parquet
     file → Copy (binary): inbound/<source>/<entity>/*  lọc LastModified (wm, run_start]
            → Files/landing/<source>/<entity>/load_date=<d>/batch=<id>/
-nb_run_layer(layer='brz')                              ← load landing → brz.*
-nb_ops_set_watermark                                   ← CHỈ khi copy + load thành công
+nb_brz_load                                            ← load landing → brz.* rồi ghi watermark
+                                                         (CHỈ khi copy + load thành công;
+                                                          db = max(updated_at) dữ liệu, file = run_start;
+                                                          1 dòng / load_date → chạy lại ngày D dùng lại cửa sổ cũ)
+                                                         chi tiết: guide/01-ingest/05-watermark.md
 ```
 
 ### 8.2 `nb_brz_load` — 1 notebook cho mọi entity

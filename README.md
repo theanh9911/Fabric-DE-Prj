@@ -11,3 +11,4 @@ Kế hoạch & nguyên tắc: [docs/PLAN.md](docs/PLAN.md).
 | `fabric/source/` | Workspace `CompanyA-Source` (Git sync): ERP giả lập, drop zone, simulator |
 | `fabric/platform/` | Workspace `CompanyA-DataPlatform-<Dev\|Prod>` (Git sync): `lh_platform`, notebook, pipeline |
 | `docs/` | Plan, ADR, runbook |
+| `docs/guide/` | Hướng dẫn thao tác từng bước — bắt đầu từ [docs/guide/README.md](docs/guide/README.md) |
