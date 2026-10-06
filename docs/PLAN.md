@@ -2,7 +2,7 @@
 
 > Mô phỏng 1 dự án Data Engineering thật trên Microsoft Fabric, dựa trên đề *Data Engineer Case Study*.
 > Làm việc trên **Fabric web UI** + **Git (GitHub)**. Hướng **SQL-first**: biến đổi dữ liệu bằng Spark SQL; Python chỉ là "keo dán".
-> Trạng thái: **Source ✅ xong · Platform: bắt đầu** · Cập nhật: 2026-10-06
+> Trạng thái: **Source ✅ xong · Platform: Bước 0 ✅ → Bước 1** · Cập nhật: 2026-10-06
 
 ---
 
