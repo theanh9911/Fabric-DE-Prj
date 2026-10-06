@@ -12,7 +12,6 @@
 # MARKDOWN ********************
 
 # # nb_00_sim_setup
-#
 # - **Mục đích:** chuẩn bị "kho" dữ liệu cho simulator — đọc 9 CSV gốc, gắn ngày release cho từng dòng.
 # - **Input:** `lh_sim/Files/seed/*.csv` (upload tay 1 lần từ đề bài).
 # - **Output:** `lh_sim/Tables/seed_<source>_<entity>` — giữ nguyên mọi cột dạng chuỗi + `_row_no`, `_release_date`.
@@ -20,7 +19,7 @@
 
 # CELL ********************
 
-# MAGIC %run nb_00_sim_common
+%run nb_00_sim_common%run nb_00_sim_common
 
 # METADATA ********************
 

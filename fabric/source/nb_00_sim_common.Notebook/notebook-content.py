@@ -12,10 +12,8 @@
 # MARKDOWN ********************
 
 # # nb_00_sim_common
-#
-# Thư viện dùng chung của **Source simulator** (`%run nb_00_sim_common`).
-#
-# - **Mục đích:** config + hàm cho các notebook `nb_00_sim_*` — một chỗ duy nhất (P4).
+# # Thư viện dùng chung của **Source simulator** (`%run nb_00_sim_common`).
+# # - **Mục đích:** config + hàm cho các notebook `nb_00_sim_*` — một chỗ duy nhất (P4).
 # - **Không** chứa logic chạy; chỉ định nghĩa.
 # - **Ranh giới:** chỉ ghi vào `sqldb_erp_wholesale`, `lh_retail_drop`, `lh_sim` (workspace Source).
 

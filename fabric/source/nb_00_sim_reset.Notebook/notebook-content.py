@@ -12,8 +12,7 @@
 # MARKDOWN ********************
 
 # # nb_00_sim_reset
-#
-# - **Mục đích:** đưa Source về trạng thái rỗng để chạy lại simulator từ đầu (initial load lại).
+# # - **Mục đích:** đưa Source về trạng thái rỗng để chạy lại simulator từ đầu (initial load lại).
 # - **Xoá:** dữ liệu `dbo.*` trong ERP, file trong `lh_retail_drop/Files/inbound/`, `sim_state`, `sim_release_log`, `sim_reject_log`.
 # - **Giữ:** seed (`Files/seed`, `seed_*`), schema ERP.
 # - ⚠️ Platform đang giữ watermark/manifest của dữ liệu cũ → reset Source thì cũng phải reset state phía Platform.
@@ -32,7 +31,7 @@ p_confirm = ""
 
 # CELL ********************
 
-# MAGIC %run nb_00_sim_common
+%run nb_00_sim_common%run nb_00_sim_common
 
 # METADATA ********************
 
