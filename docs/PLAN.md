@@ -32,7 +32,7 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 
 | # | Tiêu chí | Đo bằng |
 |---|---|---|
-| S1 | Chạy tự động ≥ 7 ngày giả lập liên tục | `meta.pipeline_run` |
+| S1 | Chạy tự động ≥ 7 ngày giả lập liên tục | Monitoring hub + `meta.ingestion_batch` đủ 7 `load_date` |
 | S2 | **Rerun** (cùng input + cùng code) bất kỳ ngày nào → kết quả không đổi | chạy 2 lần, so count + amount |
 | S3 | Thêm 1 nguồn mới → chỉ thêm 1 dòng `cfg_source_entity` (tới Bronze) | PR chỉ đụng `nb_setup_config` |
 | S4 | Report = SQL = recon | `meta.reconciliation_result` |
@@ -58,7 +58,7 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 |---|---|---|---|
 | D1 | Luật chuẩn hoá ở bảng `ref_*` + SQL | SQL function trong `nb_common`; bảng chỉ khi người vận hành cần sửa không qua release (hiện không có) | design/06 §2–3 |
 | D2 | Config chỉ code đọc vẫn để bảng | Code ở đúng nơi dùng (DAG trong runner, rule trong `nb_dq`) | design/09, 08 |
-| D3 | 13 bảng meta tạo sẵn | **7 bảng** có mục đích riêng, tạo đúng bước: `cfg_source_entity`, `watermark_state`, `ingestion_batch`, `pipeline_run`, `task_run`, `dq_result`, `reconciliation_result` | design/04 |
+| D3 | 13 bảng meta tạo sẵn | **5 bảng** có mục đích riêng, tạo đúng bước: `cfg_source_entity`, `watermark_state`, `ingestion_batch` (Bước 1) · `dq_result`, `reconciliation_result` (Bước 3/6); `run_summary` chỉ khi report cần (D18) | design/04 |
 | D4 | Bỏ hẳn manifest file | **`ingestion_batch`** ghi cửa sổ nguồn / từng file (path, size, modified); checksum giai đoạn sau | design/03 §5, 04 |
 | D5 | Watermark 1 dòng / `load_date` | `watermark_state` = trạng thái hiện hành; lịch sử + cửa sổ ở `ingestion_batch`; `load_date` **không** thay watermark | design/03 §2 |
 | D6 | "Chạy lại ra cùng kết quả" tuyệt đối | Phân biệt **normal / rerun / reprocess** | design/03 §3 |
@@ -72,6 +72,8 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 | D14 | `batch_id` vừa là khoá dòng log vừa là định danh dữ liệu | `ingestion_batch_id` = 1 lần thử (khoá); `batch_id` + `landing_path` = dữ liệu được replay (ổn định khi rerun) | design/04 §2 |
 | D15 | Cửa sổ ERP so `updated_at` (giờ giả lập) với `run_start` (giờ thật) | **Mỗi cửa sổ chỉ dùng một đồng hồ:** ERP cận trên = cuối ngày `p_load_date` (đồng hồ nguồn); file theo giờ thật. Múi giờ chỉ ảnh hưởng Silver | design/01 §4, 03 §2 |
 | D16 | Recon Source↔Bronze bằng `rowsRead` cho mọi nguồn | db: `rowsRead`; file Binary: **số file** (không có `rowsRead`); số dòng file chỉ sau parse | design/03 §8, 08 §3 |
+| D18 | Tự ghi `pipeline_run`, `task_run` (nhân bản log Fabric) | **Log vận hành ở Monitoring hub**; `meta` chỉ audit dữ liệu; RESTORE theo Delta history + `userMetadata = run_id`; bỏ `nb_ops_run_end` | design/04 §1 |
+| D19 | Watermark mới = giá trị của batch | **Không bao giờ lùi:** `max(watermark hiện tại, giá trị batch)` — lookback có thể cho batch toàn dòng cũ | design/03 §3 |
 | D17 | File gửi lại có thể lọt khỏi cửa sổ | Hợp đồng: gửi lại = ghi đè (LastModified mới). Ingest file lookback 1 ngày + dedup **hash nội dung**; LastModified cũ hơn lookback = vi phạm hợp đồng | design/01, 03 §5 |
 
 ---
@@ -131,11 +133,11 @@ GitHub: notebook, pipeline, SQL, docs, config không bí mật
 | # | Việc | Ai | Xong khi |
 |---|---|---|---|
 | 1.1 | Khung `pl_ingest` + nhánh db | B | ✅ |
-| 1.2 | `nb_setup_ddl` v4: tạo `watermark_state`, `ingestion_batch`, `pipeline_run`, `task_run`; cột `load_strategy`… cho `cfg_source_entity`; xoá bảng bỏ | C | notebook trong repo |
+| 1.2 | `nb_setup_ddl` v4: tạo `watermark_state`, `ingestion_batch`; cột `load_strategy`… cho `cfg_source_entity`; xoá bảng bỏ | C | notebook trong repo |
 | 1.3 | `nb_setup_config` v4: 9 dòng với 3 chiến lược; bỏ `ref_*` | C | |
-| 1.4 | Dọn Dev (xoá bảng bỏ, xoá landing thử) → chạy 1.2, 1.3 | B | `meta` đúng 5 bảng |
+| 1.4 | Dọn Dev (xoá bảng bỏ, xoá landing thử) → chạy 1.2, 1.3 | B | `meta` đúng 3 bảng |
 | 1.5 | Pipeline: Lookup "ingest plan" mới · Switch theo `load_strategy` · nhánh file · biểu thức Copy theo cửa sổ | B (C đưa biểu thức) | Preview Lookup đúng cửa sổ |
-| 1.6 | `nb_brz_load` (Bronze + `ingestion_batch` + `task_run` + `watermark_state`) · `nb_ops_run_end` (`pipeline_run`) | C | |
+| 1.6 | `nb_brz_load` (Bronze + `ingestion_batch` + `watermark_state`, ghi bảng kèm `userMetadata = run_id`) | C | |
 | 1.7 | Nối notebook vào pipeline; spike K5 (metadata file nguồn), K6 (`%%configure` qua pipeline) | B+C | |
 | 1.8 | Kiểm: normal → rerun (không đổi) → sim +1 ngày → normal (chỉ tăng phần mới) | B+C | 4 ca xanh |
 
@@ -187,7 +189,7 @@ Scenario `bad_rows`, `missing_file`, `file_resend`, `duplicate_file`, `partial_f
 
 | Rủi ro | Giảm thiểu |
 |---|---|
-| Capacity trial nhỏ (lỗi 430) | 1 phiên Spark mỗi lúc; `runMultiple`; `pipeline_run` ghi 1 lần cuối lượt |
+| Capacity trial nhỏ (lỗi 430) | 1 phiên Spark mỗi lúc; `runMultiple`; không thêm notebook chỉ để ghi log (dùng Monitoring hub) |
 | SQL endpoint đồng bộ trễ → Lookup đọc watermark cũ khi chạy liên tiếp | Rerun/idempotent nên chỉ lấy dư; nếu đo thấy vấn đề → control tables sang Fabric SQL Database (design/04) |
 | `%%configure` lỗi trong high-concurrency session | Tắt HC cho notebook; spike K6 |
 | Không lấy được metadata file nguồn | Spike K5 (Copy session log / Get Metadata); dedup không phụ thuộc vì dùng hash nội dung |
@@ -207,4 +209,4 @@ Scenario `bad_rows`, `missing_file`, `file_resend`, `duplicate_file`, `partial_f
 | 011 | SQL-first; bỏ framework Python (nhánh `archive/python-framework`) |
 | 012 | Ingest bằng pipeline Copy; ba chiến lược theo loại nguồn; mỗi cửa sổ một đồng hồ (design/03) |
 | 013 | Logic ở code, config ở bảng khi runtime cần (design/06 §2) |
-| 014 | Control tables: watermark hiện hành + `ingestion_batch` (lần thử ≠ dữ liệu replay); normal/rerun/reprocess (design/03–04) |
+| 014 | Log vận hành ở Fabric; `meta` chỉ audit dữ liệu: watermark (không lùi) + `ingestion_batch` (lần thử ≠ dữ liệu replay); normal/rerun/reprocess (design/03–04) |

@@ -37,7 +37,7 @@ Partition: không partition lúc đầu (dữ liệu nhỏ). Xem lại ở bài 
 ## 4. Schema drift
 | Tình huống | Bronze | Silver/Gold |
 |---|---|---|
-| Cột mới | Ghi nhận (`mergeSchema`) + log vào `task_run.details_json` + cảnh báo | **Không tự động** lan xuống; mở rộng có chủ đích (sửa SQL, review) |
+| Cột mới | Ghi nhận (`mergeSchema`) + `ingestion_batch.schema_changes` + cảnh báo | **Không tự động** lan xuống; mở rộng có chủ đích (sửa SQL, review) |
 | Cột mất | Giá trị NULL cho batch mới + cảnh báo | Silver DQ bắt |
 | Đổi kiểu (ERP) | Batch **fail** (không tự ép) + cảnh báo | — |
 

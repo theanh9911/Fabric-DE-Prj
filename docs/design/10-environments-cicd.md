@@ -34,7 +34,7 @@ Source dùng chung cho mọi môi trường Platform (cùng nguồn để so sá
 Dev: làm → kiểm (DQ, recon, rerun 2 lần xanh)
   → PR dev → (test) → main   [review diff notebook/pipeline/SQL]
   → ws đích: Update all → nb_setup_ddl → nb_setup_config → chạy thử 1 ngày
-  → kiểm sau deploy: pipeline_run SUCCEEDED, recon PASS, report mở được
+  → kiểm sau deploy: pipeline Succeeded (Monitoring hub), recon PASS, report mở được
   → tag (v1.0…)
 ```
 

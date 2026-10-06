@@ -31,9 +31,11 @@ Cột `cfg_source_entity.load_strategy` quyết định nhánh.
 
 | | `window_start` | `window_end` | Watermark mới (khi COMMITTED) |
 |---|---|---|---|
-| db_incremental | `watermark − lookback` (chưa có → 1900-01-01) | `p_load_date + 1 ngày` | `max(updated_at)` đã lấy (0 dòng → giữ nguyên) |
-| file_new_or_changed | `watermark − lookback` | `run_start − settle` | `window_end` |
+| db_incremental | `watermark − lookback` (chưa có → 1900-01-01) | `p_load_date + 1 ngày` | `max(watermark hiện tại, max(updated_at) đã lấy)` |
+| file_new_or_changed | `watermark − lookback` | `run_start − settle` | `max(watermark hiện tại, window_end)` |
 | db_full_snapshot | — | — | — |
+
+- **Watermark không bao giờ lùi.** Vì có lookback, batch có thể chỉ chứa dòng *cũ hơn* watermark hiện tại (vd hôm nay không có dòng mới, chỉ đọc lại phần lookback) → `max(updated_at)` của batch < watermark. Lấy thẳng giá trị đó sẽ kéo watermark lùi và lần sau đọc lại nhiều hơn mỗi ngày. 0 dòng → giữ nguyên.
 
 - `load_date` là **nhãn logic** của lượt chạy (thư mục landing, `_load_date`) **và** là đồng hồ nguồn cho ERP trong mô phỏng. Nó không thay watermark.
 - Lookback (mặc định 1440 phút) cho cả ERP và file: bắt dòng commit trễ / file ghi đè có thời gian lệch. Phần lấy dư được loại ở bước dedup (ERP: Silver theo khoá; file: hash nội dung ở Bronze).
@@ -83,9 +85,9 @@ fe_source_entity      items = rerun ? [] : output Lookup
     file    → cp_file_to_landing   Binary, lọc LastModified [window_start, window_end)
     default → fail_unknown_source_type
 nb_brz_load(p_load_date, p_run_id, p_mode, p_plan = output Lookup JSON)
-                      → Bronze + ingestion_batch + task_run + watermark_state
-run_end_ok / run_end_fail → nb_ops_run_end → pipeline_run (FAILED thì notebook tự fail)
+                      → Bronze + ingestion_batch + watermark_state
 ```
+Trạng thái lượt chạy, thời lượng, lỗi từng activity: **Monitoring hub** (design/04 §1). Bất kỳ activity nào lỗi → pipeline FAILED trên Fabric; không cần notebook ghi lại.
 
 Landing: `Files/landing/<source>/<entity>/load_date=<d>/batch=<RunId>/` — thư mục mới mỗi lượt, không ghi đè.
 
@@ -96,7 +98,7 @@ Landing: `Files/landing/<source>/<entity>/load_date=<d>/batch=<RunId>/` — thư
 | db (table → parquet) | `rowsRead`, `rowsCopied` | so với số dòng Bronze của batch |
 | file (Binary) | `filesRead`, `filesWritten`, `dataRead` — **không có số dòng** | so số file Copy ghi với số file trong `ingestion_batch`; số dòng chỉ biết sau parse (`bronze_row_count`) |
 
-`nb_brz_load` nhận các số này qua tham số (output Copy) — chi tiết ở design/04.
+Bước 1: xem các số này trong Monitoring hub khi kiểm thử. Chỉ lưu vào `ingestion_batch` nếu đối soát **tự động** cần (Bước 6, spike K7).
 
 ## Quyết định
 - ADR 012: Copy cho mọi nguồn; 3 chiến lược; cửa sổ ERP theo **đồng hồ nguồn** (virtual clock), file theo giờ thật + lookback + hash.
@@ -104,4 +106,4 @@ Landing: `Files/landing/<source>/<entity>/load_date=<d>/batch=<RunId>/` — thư
 ## Còn mở (spike)
 - **K5:** metadata file **nguồn** (size, LastModified) cho `ingestion_batch` — Copy session log / Get Metadata. Không chặn: dedup đã dựa vào hash.
 - **K6:** `%%configure -f` khi notebook chạy từ pipeline.
-- **K7:** lấy output Copy (`rowsRead`, `filesWritten`) của từng entity trong ForEach để truyền cho `nb_brz_load` (Append variable trong ForEach, hoặc notebook đọc Copy log).
+- **K7 (Bước 6, nếu cần):** đưa output Copy (`rowsRead`, `filesWritten`) của từng entity vào `ingestion_batch` cho đối soát tự động (Append variable trong ForEach, hoặc đọc Copy log).

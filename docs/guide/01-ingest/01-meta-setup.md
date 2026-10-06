@@ -12,8 +12,8 @@
 | `cfg_source_entity` | Danh sách nguồn + chiến lược | `nb_setup_config` |
 | `watermark_state` | Mốc hiện hành của mỗi entity (1 dòng / entity) | `nb_brz_load` |
 | `ingestion_batch` | Mỗi lần ingest 1 entity / 1 file: cửa sổ, số dòng, trạng thái | `nb_brz_load` |
-| `task_run` | Mỗi bước, mỗi lần thử | `nb_brz_load` (sau này runner) |
-| `pipeline_run` | Mỗi lượt chạy pipeline | `nb_ops_run_end` |
+
+Trạng thái pipeline/activity, thời lượng, lỗi, Copy output: xem ở **Monitoring hub** — không tự ghi lại ([design/04 §1](../../design/04-control-tables.md)).
 
 **Bỏ** (đã tạo ở Bước 0): `cfg_pipeline_step`, `cfg_dq_rule`, `ref_order_status`, `ref_value_mapping`, `ref_holiday_vn`, `state_watermark`, `state_file_manifest`, `log_pipeline_run`, `log_task_run`, `dq_result_log`, `recon_result`, `schema_registry`. `dq_result`, `reconciliation_result` tạo lại ở Bước 3.
 
@@ -34,7 +34,7 @@
 ## Làm
 
 **C — Claude viết vào repo:**
-1. `nb_setup_ddl` v4: cell xoá bảng bỏ (chỉ chạy được khi bảng tồn tại — `DROP TABLE IF EXISTS`), cell tạo 5 bảng trên.
+1. `nb_setup_ddl` v4: cell xoá bảng bỏ (chỉ chạy được khi bảng tồn tại — `DROP TABLE IF EXISTS`), cell tạo 2 bảng `watermark_state`, `ingestion_batch` và sửa cột `cfg_source_entity`.
 2. `nb_setup_config` v4: 1 MERGE cho `cfg_source_entity` như bảng trên; bỏ các cell `ref_*`.
    (`nb_common` không đổi ở bước này; function `std_*` viết ở Bước 2.)
 
@@ -46,6 +46,6 @@
 5. Mở `lh_platform` → đổi sang **SQL analytics endpoint** → **Refresh** (để Lookup thấy bảng mới).
 
 ## Kết quả mong đợi
-- `SHOW TABLES IN meta` → đúng **5 bảng**.
+- `SHOW TABLES IN meta` → đúng **3 bảng**.
 - `SELECT load_strategy, count(*) FROM meta.cfg_source_entity GROUP BY load_strategy` → `file_new_or_changed 5 · db_full_snapshot 3 · db_incremental 1`.
 - `Files/` không còn `landing/`.

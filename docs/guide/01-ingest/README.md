@@ -1,16 +1,16 @@
 # Bước 1 — Ingest happy path ▶
 
-**Mục tiêu:** `pl_ingest(p_load_date)` lấy phần mới của 9 nguồn → landing → Bronze; ghi lại cửa sổ đã đọc, số dòng, trạng thái; tiến watermark khi thành công. Chạy rerun → Bronze không đổi.
+**Mục tiêu:** `pl_ingest(p_load_date)` lấy phần mới của 9 nguồn → landing → Bronze; ghi audit dữ liệu (`ingestion_batch`); tiến watermark khi thành công (không lùi). Rerun → Bronze không đổi. Trạng thái chạy, thời lượng, lỗi: Monitoring hub.
 
 Thiết kế: [design/03 ingest](../../design/03-ingest.md) · [04 control tables](../../design/04-control-tables.md) · [05 bronze](../../design/05-bronze.md).
 
 ## Hình dạng cuối của `pl_ingest`
 
 ```
-set_run_start ─✓─▶ lkp_source_entity ─✓─▶ fe_source_entity ─✓─▶ nb_brz_load ─✓─▶ run_end_ok   (nb_ops_run_end SUCCEEDED)
-                                           └ sw_source_type        │
-                                               ├ db   → cp_db_to_landing      ├─✗─┐
-                                               ├ file → cp_file_to_landing    └─↷─┴▶ run_end_fail (nb_ops_run_end FAILED → fail)
+set_run_start ─✓─▶ lkp_source_entity ─✓─▶ fe_source_entity ─✓─▶ nb_brz_load
+                                           └ sw_source_type
+                                               ├ db      → cp_db_to_landing
+                                               ├ file    → cp_file_to_landing
                                                └ default → fail_unknown_source_type
 ```
 
@@ -22,8 +22,7 @@ set_run_start ─✓─▶ lkp_source_entity ─✓─▶ fe_source_entity ─�
 | `sw_source_type` | `db_*` → nhánh db · `file_*` → nhánh file |
 | `cp_db_to_landing` | ERP → parquet; full snapshot hoặc theo cửa sổ |
 | `cp_file_to_landing` | Chép nguyên file có LastModified trong cửa sổ |
-| `nb_brz_load` | landing → Bronze; ghi `ingestion_batch`, `task_run`, `watermark_state` |
-| `nb_ops_run_end` | Ghi `pipeline_run`; trạng thái FAILED → notebook tự fail để pipeline báo lỗi |
+| `nb_brz_load` | landing → Bronze; ghi `ingestion_batch`, `watermark_state` (không lùi); lỗi → pipeline FAILED |
 
 ## Việc (thứ tự làm)
 
@@ -34,7 +33,7 @@ set_run_start ─✓─▶ lkp_source_entity ─✓─▶ fe_source_entity ─�
 | 1.5 | [02-khung-pipeline.md](02-khung-pipeline.md) — tham số, Lookup, ForEach, Switch | B | ⏳ |
 | 1.5 | [03-nhanh-db.md](03-nhanh-db.md) — Copy ERP | B | ⏳ (sửa câu query) |
 | 1.5 | [04-nhanh-file.md](04-nhanh-file.md) — Copy file | B | ⏳ |
-| 1.6–1.7 | [05-bronze-va-log.md](05-bronze-va-log.md) — `nb_brz_load`, `nb_ops_run_end`, nối vào pipeline | C → B | ⏳ |
+| 1.6–1.7 | [05-bronze-load.md](05-bronze-load.md) — `nb_brz_load`, nối vào pipeline | C → B | ⏳ |
 | 1.8 | [06-kiem-thu.md](06-kiem-thu.md) — normal, rerun, ngày kế tiếp | B + C | ⏳ |
 | — | [99-loi-da-gap.md](99-loi-da-gap.md) | | |
 
