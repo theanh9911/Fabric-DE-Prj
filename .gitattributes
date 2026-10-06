@@ -1,3 +1,6 @@
-# Fabric Git sync và container Linux dùng LF → giữ LF cho mọi file text, tránh diff rác do CRLF trên Windows
+# Code của mình: LF (khớp container Linux), tránh diff rác do CRLF trên Windows
 * text=auto eol=lf
 *.ps1 text eol=crlf
+
+# fabric/ do Fabric Git sync quản lý → giữ nguyên byte Fabric ghi (một số file Fabric dùng CRLF)
+fabric/** -text
