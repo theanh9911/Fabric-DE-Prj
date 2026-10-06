@@ -41,6 +41,12 @@ SIM_CONFIG = {
     "erp_item": "sqldb_erp_wholesale",
     "sim_lakehouse": "lh_sim",
     "drop_lakehouse": "lh_retail_drop",
+    # Virtual clock: lần chạy đầu release toàn bộ lịch sử tới ngày này, sau đó mỗi lần tiến p_days ngày.
+    # 2025-12-31 → giai đoạn replay 2026-01..05 chứa đúng các kịch bản của đề (Q14 01/2026, Q15 05/2026, Q16 06/2026).
+    "initial_until": "2025-12-31",
+    # Data thật kết thúc ~05/2026; dòng có ngày sau mốc này là LỖI NHẬP LIỆU (năm 2027) chứ không phải tương lai
+    # → coi như đã nằm sẵn trong nguồn: release ngay ở initial load để platform bắt bằng DQ future_date.
+    "future_date_cutoff": "2026-12-31",
 }
 
 # Thứ tự khai báo = thứ tự release (master trước, orders sau)
@@ -138,12 +144,18 @@ def parse_ts(col_name: str):
 
 
 def release_date_col(entity: str, columns: list):
-    """Ngày dòng 'xuất hiện' ở nguồn: orders theo updated_at; master theo max(created, updated)."""
+    """Ngày dòng 'xuất hiện' ở nguồn (theo virtual clock).
+
+    - orders: ngày của updated_at; master: ngày của max(created/inserted, updated)
+    - không parse được hoặc sau future_date_cutoff (ngày sai) → EPOCH = release ở initial load
+    """
     if ENTITIES[entity]["kind"] == "event":
         ts = parse_ts("updated_at")
     else:
         ts = F.greatest(*[parse_ts(c) for c in columns if c in TS_COLUMNS])
-    return F.coalesce(F.to_date(ts), F.lit(EPOCH))
+    day = F.to_date(ts)
+    cutoff = F.lit(dt.date.fromisoformat(SIM_CONFIG["future_date_cutoff"]))
+    return F.when(day.isNull() | (day > cutoff), F.lit(EPOCH)).otherwise(day)
 
 
 def to_erp_typed(df: DataFrame) -> DataFrame:
@@ -261,12 +273,17 @@ def erp_merge_sql(entity: str, cols: list, pk: list) -> str:
     )
 
 
-def erp_replace_window_sql(entity: str, cols: list, window_from: dt.date, window_to: dt.date) -> str:
-    """Xoá rồi chèn lại đúng cửa sổ updated_at → chạy lại cùng cửa sổ không nhân đôi dòng."""
+def erp_replace_window_sql(entity: str, cols: list, window_from: dt.date, window_to: dt.date,
+                           is_initial_load: bool) -> str:
+    """Xoá rồi chèn lại đúng phần dữ liệu của cửa sổ → chạy lại cùng cửa sổ không nhân đôi dòng.
+
+    Initial load xoá toàn bảng (cửa sổ đầu gồm cả dòng ngày sai/không parse được, nằm ngoài khoảng updated_at).
+    """
     col_list = ", ".join(f"[{c}]" for c in cols)
     to_exclusive = window_to + dt.timedelta(days=1)
+    delete_where = "" if is_initial_load else f" WHERE updated_at >= '{window_from}' AND updated_at < '{to_exclusive}'"
     return (
-        f"DELETE FROM dbo.[{entity}] WHERE updated_at >= '{window_from}' AND updated_at < '{to_exclusive}'; "
+        f"DELETE FROM dbo.[{entity}]{delete_where}; "
         f"INSERT INTO dbo.[{entity}] ({col_list}) SELECT {col_list} FROM sim.[stg_{entity}];"
     )
 

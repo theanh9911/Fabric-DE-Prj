@@ -13,21 +13,24 @@
 
 # # nb_00_sim_daily
 #
-# - **Mục đích:** "hệ thống nguồn" phát sinh dữ liệu — release mọi dòng seed có `_release_date` trong cửa sổ
-#   `(released_until, p_sim_date]`.
+# - **Mục đích:** "hệ thống nguồn" phát sinh dữ liệu theo **virtual clock** — release mọi dòng seed có
+#   `_release_date` trong cửa sổ `(released_until, released_until + p_days]`.
+# - **Virtual clock:** ngày giả lập lưu trong `lh_sim.sim_state`, độc lập với ngày thật. Data giữ nguyên ngày gốc.
 # - **Wholesale → `sqldb_erp_wholesale`:** master MERGE, orders xoá-rồi-chèn theo cửa sổ `updated_at`.
 #   Dòng vi phạm NOT NULL / PK bị "DB từ chối" → `lh_sim.sim_reject_log`.
 # - **Retail → `lh_retail_drop/Files/inbound/<entity>/`:**
 #   orders 1 file/ngày (`orders_YYYYMMDD.csv`), cửa sổ dài (initial load) → 1 file `orders_history_until_YYYYMMDD.csv`;
 #   master có thay đổi → file snapshot `<entity>_YYYYMMDD.csv`.
-# - **Lần chạy đầu** = initial load toàn bộ lịch sử tới `p_sim_date`. Dòng có ngày tương lai được giữ lại,
-#   tự release khi tới ngày.
-# - **Bù ngày:** lỡ N ngày → lần sau release đủ N ngày. **Chạy lại** cùng ngày → không release gì thêm.
-# - **Lịch:** hằng ngày 05:00 (trước platform 06:00).
+# - **Lần chạy đầu** = initial load toàn bộ lịch sử tới `SIM_CONFIG.initial_until` (kèm dòng ngày sai/không parse được).
+# - **Các lần sau:** tiến `p_days` ngày giả lập (mặc định 1). `p_sim_date` = nhảy tới đúng ngày (tua nhanh / drill).
+# - **Chạy lại sau lỗi:** state chưa tiến → cùng cửa sổ, ghi lại không nhân đôi. State chỉ tiến khi mọi bước thành công.
+# - **Exit value:** ngày giả lập mới (`YYYY-MM-DD`) → pipeline truyền làm `p_load_date` cho Platform.
+# - **Lịch:** hằng ngày 05:00 (1 ngày thật = 1 ngày giả lập), hoặc `pl_sim_drive` để tua nhiều ngày.
 
 # PARAMETERS CELL ********************
 
-p_sim_date = ""   # 'YYYY-MM-DD' — release tới hết ngày này. Rỗng = hôm qua (UTC)
+p_days = 1        # số ngày giả lập tiến thêm mỗi lần chạy
+p_sim_date = ""   # 'YYYY-MM-DD' — (tuỳ chọn) nhảy tới đúng ngày này, bỏ qua p_days
 
 # METADATA ********************
 
@@ -49,18 +52,22 @@ p_sim_date = ""   # 'YYYY-MM-DD' — release tới hết ngày này. Rỗng = h�
 
 # CELL ********************
 
-sim_date = (
-    dt.date.fromisoformat(p_sim_date)
-    if p_sim_date
-    else dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)
-)
 released_until = get_released_until()
 is_initial_load = released_until is None
-window_from = EPOCH if is_initial_load else released_until + dt.timedelta(days=1)
-window_to = sim_date
+
+if is_initial_load:
+    window_from = EPOCH
+    window_to = dt.date.fromisoformat(p_sim_date or SIM_CONFIG["initial_until"])
+else:
+    window_from = released_until + dt.timedelta(days=1)
+    window_to = (
+        dt.date.fromisoformat(p_sim_date) if p_sim_date
+        else released_until + dt.timedelta(days=int(p_days))
+    )
 
 if window_to < window_from:
-    notebookutils.notebook.exit(f"NOTHING_TO_RELEASE: released_until={released_until}, p_sim_date={sim_date}")
+    # Không lùi đồng hồ được — muốn làm lại từ đầu thì chạy nb_00_sim_reset
+    notebookutils.notebook.exit(str(released_until))
 
 sim_run_id = f"sim_{window_to:%Y%m%d}_{uuid.uuid4().hex[:8]}"
 print(f"{sim_run_id}: release window [{window_from} → {window_to}]")
@@ -89,7 +96,7 @@ def release_wholesale(entity: str, batch: DataFrame):
     else:
         # Luôn chạy (kể cả 0 dòng) để cửa sổ trong ERP khớp đúng seed → idempotent
         erp_write_stage(ok, entity)
-        erp_exec(erp_replace_window_sql(entity, cols, window_from, window_to))
+        erp_exec(erp_replace_window_sql(entity, cols, window_from, window_to, is_initial_load))
 
     ok.unpersist()
     return n_ok, rejected, f"sqldb_erp_wholesale.dbo.{entity}"
@@ -173,6 +180,16 @@ if reject_dfs:
 set_released_until(window_to, sim_run_id)
 
 display(release_log)
+
+last_seed_date = max(
+    spark.read.format("delta").load(sim_table(f"seed_{source}_orders")).agg(F.max("_release_date")).first()[0]
+    for source in ENTITIES["orders"]["sources"]
+)
+if window_to >= last_seed_date:
+    print(f"⚠️ Seed orders đã release hết (ngày cuối {last_seed_date}). Các ngày sau cần chế độ generate.")
+
+# Ngày giả lập mới → pipeline dùng làm p_load_date cho Platform
+notebookutils.notebook.exit(str(window_to))
 
 # METADATA ********************
 

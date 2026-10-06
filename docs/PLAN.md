@@ -401,11 +401,15 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 
 ### 7.2 Timeline
 
-- Mỗi dòng seed có `_release_date` = ngày nó "xuất hiện" ở nguồn: orders theo `updated_at`; master theo `max(created_at, updated_at)`; không parse được → release ngay.
-- **Lần chạy đầu = initial load** toàn bộ lịch sử tới hôm qua (retail: 1 file `orders_history_until_YYYYMMDD.csv`).
-- **Dòng có ngày tương lai** (tới 12/2027) **được giữ lại**, release dần khi tới ngày → incremental hằng ngày tự nhiên.
-- Master có ngày tương lai (vd `CUS028` 2027) → orders tham chiếu nó tạm thời là orphan → kịch bản **late-arriving dimension** thật.
-- Hết seed → chuyển sang generate (7.4).
+**Virtual clock** — ngày giả lập (`lh_sim.sim_state.released_until`) độc lập với ngày thật; data giữ nguyên ngày gốc.
+
+- Mỗi dòng seed có `_release_date` = ngày nó "xuất hiện" ở nguồn: orders theo `updated_at`; master theo `max(created/inserted, updated)`.
+- Không parse được hoặc **sau `future_date_cutoff` (2026-12-31)** → coi là ngày sai đã nằm sẵn trong nguồn → release ở initial load (platform bắt bằng DQ `future_date`). Đây là ~40 dòng năm 2027 mỗi nguồn.
+- **Initial load** tới `initial_until = 2025-12-31`: ~42k dòng/nguồn (retail: 1 file `orders_history_until_20251231.csv`).
+- **Replay** mỗi lần tiến `p_days` (mặc định 1): 2026-01-01 → ~2026-05-10, ~130 ngày, median ~62 dòng/ngày/nguồn (retail 1 file/ngày).
+- Kịch bản đề rơi vào giai đoạn replay: Q14 (02/01 → 15/01/2026) ✅; Q15 (05/2026) chỉ có 1–10/05 từ seed; Q16 (01/06/2026) cần **generate**.
+- `p_sim_date` = nhảy tới đúng ngày (tua nhanh); exit value = ngày giả lập mới → `p_load_date` cho Platform. `pl_sim_drive(p_days)` lặp: sim 1 ngày → `pl_master_daily(p_load_date)`.
+- Hết seed (~05/2026) → chuyển sang generate (7.4) — cần làm trước drill Q15/Q16.
 
 ### 7.3 Notebook
 
