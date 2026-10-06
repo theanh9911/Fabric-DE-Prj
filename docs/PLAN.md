@@ -91,18 +91,19 @@
                           │ Copy activity (watermark)          │ Copy activity (LastModified)
                           ▼                                    ▼
 ┌──────────────── CompanyA-DataPlatform-<Dev|Prod> ───────────────────────────────────────┐
-│ lh_bronze  Files/landing/<src>/<entity>/load_date=…/batch=…/   (immutable raw)           │
-│            Tables brz_<src>_<entity>  (append, all-string, + metadata)                   │
+│ lh_platform  (1 lakehouse, schema-enabled — mỗi layer 1 schema)                          │
+│  Files/landing/<src>/<entity>/load_date=…/batch=…/   (immutable raw)                     │
+│  brz.  brz_<src>_<entity>  (append, all-string, + metadata)                              │
 │      │  map · cast · standardize · dedup · conform · quarantine                          │
 │      ▼                                                                                   │
-│ lh_silver  slv_* · quarantine_*                                                          │
+│  slv.  slv_* · quarantine_*                                                              │
 │      │  model · SCD · surrogate key · point-in-time                                      │
 │      ▼                                                                                   │
-│ lh_gold    gld_d_* · gld_f_* · gld_a_*                                                   │
+│  gld.  gld_d_* · gld_f_* · gld_a_*                                                       │
 │      ▼                                                                                   │
-│ sm_sales (Direct Lake) → rpt_sales      sm_ops → rpt_pipeline_health                     │
+│ sm_sales (Direct Lake → gld.*) → rpt_sales      sm_ops (→ meta.*) → rpt_pipeline_health  │
 │                                                                                          │
-│ lh_meta    cfg_* (config) · ref_* (luật nghiệp vụ) · state_* · log_* · dq_* · recon_*    │
+│  meta. cfg_* (config) · ref_* (luật nghiệp vụ) · state_* · log_* · dq_* · recon_*        │
 │ pl_master_daily · pl_ingest · pl_backfill · pl_maintenance                               │
 │ nb_run_layer · nb_* đặc thù · env_common (wheel companya_de) · vl_config                 │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
@@ -115,8 +116,8 @@
 | Platform chỉ **đọc** Source; simulator không chạm Platform | mô phỏng ranh giới 2 team |
 | Ingest bằng **copy** (không shortcut/mirroring) | thể hiện ingest thật: watermark, landing, manifest |
 | Dev & Prod đọc cùng Source, **state riêng** (watermark, manifest) | chạy lại Dev không ảnh hưởng Prod |
-| Mỗi layer 1 lakehouse | phân quyền, maintenance, cấu hình riêng |
-| Layer chỉ đọc layer ngay trước nó (+ `lh_meta`) | contract rõ (P11) |
+| **1 lakehouse `lh_platform`, mỗi layer 1 schema** (`brz`, `slv`, `gld`, `meta`) | ít item, 1 SQL endpoint, join `schema.table` tự nhiên, khớp quy ước đề (`gld.gld_f_orders` ở Q17). Phân quyền theo schema bằng OneLake data access roles; analyst dùng semantic model. Tách thành nhiều lakehouse sau vẫn dễ vì path dựng từ config (ADR 010) |
+| Layer chỉ đọc schema của layer ngay trước nó (+ `meta`) | contract rõ (P11) — không còn ranh giới vật lý nên kiểm bằng review + CI (`check_layer_reads`) |
 
 ---
 
@@ -159,7 +160,7 @@ Fabric-DE-Prj/
 ├── tools/                          check_hardcode.py · check_orphans.py · check_outputs.py
 ├── fabric/
 │   ├── source/                     sqldb_erp_wholesale.SQLDatabase · lh_retail_drop · nb_00_sim_*
-│   └── platform/                   lakehouses · nb_* · pl_* · env_common · vl_config · sm_* · rpt_*
+│   └── platform/                   lh_platform · nb_* · pl_* · env_common · vl_config · sm_* · rpt_*
 ├── sql/answers/                    q05 … q07, q17, q18 …
 ├── docs/
 │   ├── PLAN.md  architecture.md  conventions.md  runbook.md  dq_findings.md
@@ -280,12 +281,13 @@ except Exception as e:
 
 | Loại | Pattern | Ví dụ |
 |---|---|---|
-| Lakehouse | `lh_<layer>` | `lh_silver` |
+| Lakehouse | `lh_<scope>` | `lh_platform` (Platform), `lh_sim`, `lh_retail_drop` (Source) |
+| Schema (layer) | `brz` · `slv` · `gld` · `meta` | `gld.gld_f_sales_line` |
 | Notebook generic | `nb_<verb>_<scope>` | `nb_run_layer`, `nb_brz_load` |
 | Notebook đặc thù | `nb_<layer>_<entity>` | `nb_gld_d_salesman` |
 | Notebook nhóm khác | `nb_setup_*` · `nb_ops_*` · `nb_00_sim_*` | `nb_setup_migrate` |
 | Pipeline | `pl_<scope>` | `pl_master_daily` |
-| Bảng | `brz_<src>_<entity>` · `slv_<entity>` · `gld_d_` / `gld_f_` / `gld_a_` | `gld_f_sales_line` |
+| Bảng | `brz_<src>_<entity>` · `slv_<entity>` · `gld_d_` / `gld_f_` / `gld_a_` — giữ prefix layer dù đã có schema (khớp đề, không nhầm khi bảng hiện không kèm schema trong semantic model / Power BI) | `gld.gld_f_sales_line` |
 | Meta | `cfg_*` (config) · `ref_*` (luật nghiệp vụ) · `state_*` (runtime) · `log_*` · `dq_*` · `recon_*` | `state_watermark` |
 | Cột | snake_case · `*_sk` surrogate · `*_code` natural · `*_key` date · `is_*` · `*_at` timestamp UTC · `*_date` date nghiệp vụ | |
 
@@ -453,7 +455,7 @@ Config/ref **không bao giờ sửa tay** trên Fabric — sửa YAML → PR →
 
 | Bước | Công cụ | Lý do |
 |---|---|---|
-| **Extract** Source → `lh_bronze/Files/landing/` | **Pipeline Copy activity** | connector, incremental filter, retry, song song, output `rowsCopied/filesWritten`, không tốn Spark |
+| **Extract** Source → `lh_platform/Files/landing/` | **Pipeline Copy activity** | connector, incremental filter, retry, song song, output `rowsCopied/filesWritten`, không tốn Spark |
 | **Load** landing → `brz_*` | **1 notebook `nb_brz_load`** chạy mọi entity của run bằng `runMultiple` | 1 Spark session cho tất cả, thay vì N session |
 
 ### 8.2 `pl_ingest`
@@ -468,7 +470,7 @@ pl_ingest(p_load_date, p_run_id)
                               AND updated_at <= run_start
               → landing/wholesale/<entity>/load_date=<d>/batch=<id>/*.parquet
       file → Copy (binary): inbound/<source>/<entity>/*  filter LastModified (wm, run_start]
-              → landing/retail/<entity>/load_date=<d>/batch=<id>/
+              → landing/<source>/<entity>/load_date=<d>/batch=<id>/      (source = retail | reference)
     ghi kết quả copy (rows/files, batch_id) vào biến mảng
   nb_brz_load(batches = [...])                        ← 1 notebook, runMultiple
   nb_ops_set_watermark(batches)                       ← CHỈ khi copy + load SUCCESS
@@ -692,12 +694,12 @@ On failure (mọi bước) → nb_ops_run_end(FAILED) → notify
 
 ## 14. Semantic model & report
 
-- `sm_sales`: **Direct Lake** trên `lh_gold`; star schema; `gld_d_date` mark as date table; ẩn SK & cột kỹ thuật.
+- `sm_sales`: **Direct Lake** trên schema `gld` của `lh_platform`; star schema; `gld_d_date` mark as date table; ẩn SK & cột kỹ thuật.
 - Measures (định nghĩa 1 lần, display folder rõ ràng): `Sales`, `Qty`, `Tax`, `Net Sales`, `Sales LY`, `YoY %`, `MTD/QTD/YTD`, `Top N Customer`, `Avg Order Value`; sau Q16 `Discount`, `Net After Discount`. Fact chỉ chứa doanh thu đã ghi nhận → DAX không lọc status (P3, P4).
 - Hierarchy point-in-time qua `salesman_sk` → DAX không cần logic thời gian.
 - (tuỳ chọn) RLS theo hierarchy.
 - `rpt_sales`: Overview · Product · Customer/Country · Sales hierarchy.
-- `sm_ops` + `rpt_pipeline_health` (trên `lh_meta`): run status, duration, rows/ngày, DQ trend, freshness, recon.
+- `sm_ops` + `rpt_pipeline_health` (trên schema `meta`): run status, duration, rows/ngày, DQ trend, freshness, recon.
 - Tối ưu Direct Lake: V-Order, OPTIMIZE, chỉ cột cần, aggregate table, theo dõi fallback DirectQuery.
 - Power BI Free xem được report trong workspace có Fabric capacity (trial).
 
@@ -773,7 +775,7 @@ SF=1000 → vài chục–vài trăm triệu dòng, đo:
 - [x] 3 workspace (đổi "Prob" → "Prod")
 - [ ] Gỡ extension VS Code; xoá `.stubs/ .vfscache/ .vfsmeta/ .work-folder-info`
 - [ ] Git integration (§3.1); branch protection `main`
-- [ ] Source: `sqldb_erp_wholesale`, `lh_retail_drop`; Platform-Dev: 4 lakehouse, `env_common`, `vl_config`, connection tới SQL DB
+- [ ] Source: `sqldb_erp_wholesale`, `lh_retail_drop`; Platform-Dev: `lh_platform` (schema-enabled; schema `brz`, `slv`, `gld`, `meta`), `env_common`, `vl_config`, connection tới SQL DB
 - [ ] Repo skeleton (§3.2), `README`, `docs/conventions.md` (= §1, §4, §5)
 - [ ] Package skeleton + CI (`lint`, `unit`, `build`) chạy xanh
 - [ ] `nb_setup_migrate`, `nb_setup_config`; `V001__meta.sql`
@@ -926,3 +928,4 @@ P0  P1  P2  P3  P4  P5  P6  P7  P8  P9  P10 P11 P12
 | 007 | Git sync theo workspace vs `fabric-cicd` |
 | 008 | ERP giả lập "hybrid" (ép timestamp/PK, giữ giá trị bẩn, FK NOCHECK) vs strict vs raw; `categories` là file `reference` |
 | 009 | Virtual clock cho simulator (initial load tới 2025-12-31, replay theo ngày giả lập) vs đồng hồ thật |
+| 010 | 1 lakehouse `lh_platform` + schema theo layer (`brz`/`slv`/`gld`/`meta`) vs 1 lakehouse mỗi layer |
