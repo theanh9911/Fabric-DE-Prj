@@ -16,6 +16,7 @@ Mọi file cùng khuôn:
 ## Đọc trước
 
 - [source.md](source.md) — Source là gì, dữ liệu đến từ đâu, virtual clock, dữ liệu bẩn.
+- [source-bang-cot.md](source-bang-cot.md) — từng bảng, từng cột của Source: nghĩa và vì sao có.
 - [khai-niem.md](khai-niem.md) — từ điển thuật ngữ.
 
 ## Lộ trình
