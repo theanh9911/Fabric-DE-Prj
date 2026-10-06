@@ -84,8 +84,8 @@ Master rất nhỏ (vài chục dòng); orders ~62 dòng / nguồn / ngày.
 | Loại | Ví dụ | Xử lý ở |
 |---|---|---|
 | Ngày nhiều định dạng (file) | `3/15/2025 9:30`, `25/3/2025`, `2025-03-15` | Silver: `parse_ts` |
-| Ngày sai / tương lai | ~40 dòng năm **2027** | DQ future_date |
-| Status sai chính tả | biến thể của Delivered/Cancelled… | `ref_value_mapping` |
+| Ngày sai / tương lai | ~40 dòng năm **2027** | ERP: nằm ngoài cửa sổ ingest → lộ ở recon · File: Silver flag |
+| Status sai chính tả | biến thể của Delivered/Cancelled… | Silver: `std_order_status` (nb_common) → không nhận ra thì quarantine |
 | Số dạng chữ | tax `five percent`; qty âm / thập phân | Silver quarantine |
 | `"NULL"` dạng chữ | `"NULL"` trong ô | `clean_text` → NULL |
 | Orphan | `CUS099`, `PRD999`, `CAT010`, `CAT999` | Gold: unknown member `-1` |
@@ -97,12 +97,12 @@ Danh sách chính xác + số lượng sẽ có ở Bước 2 (`dq_findings.md`)
 
 | Đặc điểm Source | Platform phải… |
 |---|---|
-| ERP chỉ giữ trạng thái hiện tại | tự giữ lịch sử (Bronze append, SCD2 ở Gold) |
-| `updated_at` ERP là **giờ giả lập** | watermark ERP = `max(updated_at)` dữ liệu, không phải giờ chạy ([1.5](01-ingest/05-watermark.md)) |
+| ERP chỉ giữ trạng thái hiện tại | lấy **full snapshot master mỗi ngày**, Bronze giữ mọi snapshot → lịch sử cho SCD2, phát hiện xoá |
+| `updated_at` ERP là **giờ giả lập** | watermark ERP = `max(updated_at)` dữ liệu, không phải giờ chạy ([design/03 §2](../design/03-ingest.md)) |
 | File được ghi vào drop zone theo **giờ thật** | watermark file = LastModified / `run_start` |
 | Master dạng file là snapshot đầy đủ | Silver lấy bản mới nhất theo khoá, không cộng dồn |
 | ERP ép kiểu thất bại → NULL | dòng ERP có thể mất thông tin (vd qty) — so với file retail để phát hiện |
-| Có dòng ngày 2027 | không để chúng đẩy watermark ([1.5](01-ingest/05-watermark.md)) |
+| Có dòng ngày 2027 | cận trên cửa sổ = giờ chạy → không đẩy watermark ([design/03 §2](../design/03-ingest.md)) |
 
 ## 8. Xem trạng thái Source
 

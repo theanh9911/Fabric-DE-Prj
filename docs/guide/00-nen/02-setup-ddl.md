@@ -1,5 +1,7 @@
 # 0.2 — `nb_setup_ddl`: schema + bảng meta ✅
 
+> Danh sách bảng meta được thay ở [Bước 1.2](../01-ingest/01-meta-setup.md) (13 → 5 bảng). Cách làm dưới đây giữ nguyên.
+
 ## Mục tiêu
 Có 4 schema `brz`, `slv`, `gld`, `meta` và 13 bảng `meta.*` (rỗng).
 

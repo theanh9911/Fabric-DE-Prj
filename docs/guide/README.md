@@ -1,39 +1,40 @@
-# Hướng dẫn triển khai từng bước
+# Hướng dẫn thao tác
 
-> Sổ tay thao tác cho Platform. [PLAN.md](../PLAN.md) trả lời *làm gì & vì sao* ở mức tổng thể; thư mục này trả lời *làm thế nào, click nào, ra kết quả gì*.
-> Đọc theo thứ tự. Mỗi file nhỏ = 1 việc làm xong trong 15–45 phút.
+> **Đọc theo thứ tự:** [PLAN.md](../PLAN.md) (mục tiêu, roadmap) → [design/](../design/README.md) (thiết kế từng phần — vì sao) → **guide/** (làm thế nào, click nào, ra kết quả gì).
+> Thiết kế thay đổi thì sửa **design/** trước, guide cập nhật theo.
 
-## Cách đọc 1 file
+## Đọc trước khi làm
 
-Mọi file cùng khuôn:
+| File | Nội dung |
+|---|---|
+| [khai-niem.md](khai-niem.md) | Từ điển thuật ngữ (landing, watermark, batch, rerun…) |
+| [source.md](source.md) | Source là gì, dữ liệu đi từ CSV gốc tới nguồn ra sao, virtual clock |
+| [source-bang-cot.md](source-bang-cot.md) | Từng bảng, từng cột của Source |
 
-1. **Mục tiêu** — xong việc này thì có gì.
-2. **Hiểu trước khi làm** — khái niệm cần nắm (ngắn). Từ lạ → [khai-niem.md](khai-niem.md).
-3. **Làm** — từng bước, từng click.
-4. **Kết quả mong đợi** — nhìn thấy gì là đúng.
-5. **Lỗi đã gặp** — lỗi thật đã gặp ở dự án này + cách sửa.
+## Khuôn mỗi file thao tác
 
-## Đọc trước
+1. **Mục tiêu** — xong thì có gì.
+2. **Hiểu trước khi làm** — ngắn; chi tiết ở design/.
+3. **Làm** — từng bước, từng click. Ai làm: **C** = Claude (code trong repo), **B** = Bạn (Fabric UI).
+4. **Kết quả mong đợi** — thấy gì là đúng.
+5. **Lỗi đã gặp** — ở file `99-loi-da-gap.md` của từng bước.
 
-- [source.md](source.md) — Source là gì, dữ liệu đến từ đâu, virtual clock, dữ liệu bẩn.
-- [source-bang-cot.md](source-bang-cot.md) — từng bảng, từng cột của Source: nghĩa và vì sao có.
-- [khai-niem.md](khai-niem.md) — từ điển thuật ngữ.
-
-## Lộ trình
+## Lộ trình (khớp [PLAN §5](../PLAN.md#5-roadmap-end-to-end))
 
 | Bước | Thư mục | Trạng thái |
 |---|---|---|
-| 0. Nền | [00-nen/](00-nen/README.md) | ✅ xong |
-| 1. Ingest (Source → landing → Bronze) | [01-ingest/](01-ingest/README.md) | ▶ đang làm |
-| 2. Khám phá dữ liệu (Q1) | *(viết khi tới)* | |
-| 3. Orders end-to-end | *(viết khi tới)* | |
-| 4+ | xem [PLAN §15](../PLAN.md#15-roadmap-từng-bước) | |
+| 0. Nền | [00-nen/](00-nen/README.md) | ✅ (một phần được thay ở Bước 1) |
+| 1. Ingest happy path | [01-ingest/](01-ingest/README.md) | ▶ |
+| 2. Source contract + EDA (Q1) | *viết khi tới* | |
+| 3. Orders end-to-end → `v0.1` | | |
+| 4–12 | xem PLAN §5 | |
 
-## 4 thói quen bắt buộc
+## 5 thói quen bắt buộc
 
 | Thói quen | Vì sao (đã trả giá) |
 |---|---|
-| **Pipeline: Ctrl+S sau mỗi activity** | Pipeline **không tự lưu** như notebook; mất trang = mất hết |
-| **Xong 1 việc nhỏ → Commit ngay** (Source control → Commit, nhánh `dev`) | Git là bản lưu an toàn duy nhất; có lịch sử để quay lại |
+| **Pipeline: Ctrl+S sau mỗi activity** | Pipeline không tự lưu; đã mất trọn pipeline 1 lần |
+| **Xong 1 việc nhỏ → Commit ngay** | Git là bản lưu an toàn duy nhất |
 | **Đóng tab notebook trước khi Update all** | Tránh hộp thoại "Saved version / Your version" |
-| **1 session Spark mỗi lúc; xong thì Stop session** | Capacity trial nhỏ → lỗi 430 `TooManyRequestsForCapacity` |
+| **1 phiên Spark mỗi lúc; xong thì Stop session** | Capacity trial nhỏ → lỗi 430 |
+| **Không sửa tay bảng `meta` trên Fabric** | Config sửa trong `nb_setup_config`; state/log do pipeline ghi |

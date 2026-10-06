@@ -15,7 +15,7 @@ Mô phỏng hệ thống bán buôn. 4 bảng = mô hình bán hàng tối thi�
 | 🔑 `customer_code` | NVARCHAR(20) NOT NULL | Mã khách — khoá nghiệp vụ, orders trỏ vào đây. ⚠️ cùng mã có thể có ở retail với thuộc tính khác → Silver phải gộp (survivorship) |
 | `customer_name` | NVARCHAR(200) | Tên — hiển thị trên report |
 | `country`, `city` | NVARCHAR(100) | Địa lý — report "doanh số theo quốc gia" (đề yêu cầu). ⚠️ có thể viết không thống nhất (kiểm ở Bước 2) |
-| `gender` | NVARCHAR(20) | Giới tính — phân tích khách. ⚠️ nhiều cách viết → `ref_value_mapping` (danh sách đúng: Bước 2) |
+| `gender` | NVARCHAR(20) | Giới tính — phân tích khách. ⚠️ nhiều cách viết → `std_gender()` trong `nb_common` (danh sách đúng: Bước 2) |
 | `address` | NVARCHAR(400) | Địa chỉ |
 | `created_at` | DATETIME2 | Lúc tạo khách ở ERP |
 | `updated_at` | DATETIME2 | Lúc sửa gần nhất — **cột watermark**. ⚠️ cho phép NULL → dòng NULL không bao giờ được lấy incremental |
@@ -49,7 +49,7 @@ Mô phỏng hệ thống bán buôn. 4 bảng = mô hình bán hàng tối thi�
 | `order_no` | NVARCHAR(30) NOT NULL | Số đơn. 1 đơn có nhiều dòng (nhiều sản phẩm) |
 | 🔗 `customer_code` | NVARCHAR(20) | Ai mua. ⚠️ `CUS099` không tồn tại |
 | `order_date` | DATE | **Ngày nghiệp vụ** của đơn — report tính doanh thu theo ngày này |
-| `order_status` | NVARCHAR(30) | Pending → Shipped → Delivered / Cancelled. **Chỉ Delivered tính doanh thu** (`ref_order_status`). ⚠️ sai chính tả |
+| `order_status` | NVARCHAR(30) | Pending → Shipped → Delivered / Cancelled. **Chỉ Delivered tính doanh thu** (`is_sales_recognized()` trong `nb_common`). ⚠️ sai chính tả |
 | 🔗 `product_code` | NVARCHAR(20) | Mua gì. ⚠️ `PRD999` không tồn tại |
 | 🔗 `salesman_code` | NVARCHAR(20) | Ai bán → gắn doanh thu vào cây tổ chức |
 | `quantity` | DECIMAL(18,2) | Số lượng. Để DECIMAL (không phải INT) vì ⚠️ dữ liệu có số lẻ, số âm — ERP giữ nguyên để Platform phát hiện |

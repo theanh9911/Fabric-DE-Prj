@@ -1,31 +1,42 @@
-# 1.6 — Kiểm thử Bước 1
+# 1.8 — Kiểm thử Bước 1
 
 ## Mục tiêu
-Chứng minh ingest **đủ** (không mất dòng), **idempotent** (chạy lại không đổi), **incremental** (ngày sau chỉ lấy phần mới).
+Chứng minh ingest **đủ**, **rerun không đổi**, **incremental đúng**, **lỗi không làm mất dữ liệu**.
 
-## Trước khi bắt đầu
-Xoá dữ liệu thử của các lần chạy trước để bắt đầu sạch: xoá thư mục `Files/landing/`, các bảng `brz.*`, và dòng trong `meta.state_watermark`, `meta.state_file_manifest` (Claude sẽ viết sẵn 1 cell reset trong `nb_ops_reset_ingest` khi tới bước này).
-
-## Các ca kiểm thử
+## Ca kiểm thử
 
 | # | Làm | Kỳ vọng |
 |---|---|---|
-| T1 | Run `pl_ingest` với `p_load_date = 2026-01-01` | 9 bảng `brz.*`; `brz_wholesale_orders` = số dòng `dbo.orders` ở nguồn; `brz_retail_orders` = tổng dòng 2 file csv; 9 dòng watermark |
-| T2 | Run lại **ngay** với `2026-01-01` | Số dòng mọi bảng `brz.*` **không đổi**; watermark vẫn 9 dòng cho ngày đó |
-| T3 | Chạy `nb_00_sim_daily` (Source → 2026-01-02), rồi Run `pl_ingest` với `2026-01-02` | Bronze **chỉ tăng** khoảng 62–66 dòng orders mỗi nguồn (+ dòng lookback ERP); master chỉ tăng nếu có file snapshot mới |
-| T4 | Run lại `2026-01-02` | Không đổi so với sau T3 |
+| T1 normal | Run `pl_ingest`: `p_load_date = 2026-01-01`, `p_mode = normal` | 9 bảng `brz.*`; `ingestion_batch` COMMITTED đủ 9 entity (file: 1 dòng / file); `watermark_state` 9 dòng; `pipeline_run` SUCCEEDED |
+| T2 rerun | Run `2026-01-01`, `p_mode = rerun` | Không có Copy; số dòng & checksum mọi `brz.*` **không đổi**; `ingestion_batch` thêm dòng `rerun`; watermark không đổi |
+| T3 ngày mới | Source: chạy `nb_00_sim_daily` (→ 2026-01-02). Run `2026-01-02`, `normal` | `brz_*_orders` tăng ≈ 62–66 dòng / nguồn (+ dòng lookback ERP); master ERP thêm 1 snapshot; file master chỉ thêm nếu có snapshot mới |
+| T4 lỗi | Tạm đổi `source_object` của 1 entity thành tên sai trong `nb_setup_config` → chạy lại config → Run `2026-01-02` `normal` → khôi phục config → Run lại | Lần lỗi: pipeline FAILED, `pipeline_run` FAILED, watermark entity lỗi **không tiến**. Lần sau: lấy đủ, không trùng |
 
-## Query đối chiếu (chạy trong notebook `%%sql` gắn `lh_platform`)
+## Query kiểm (notebook `%%sql`, gắn `lh_platform`)
 
 ```sql
-SELECT _source_system, _load_date, _batch_id, count(*) AS rows
-FROM brz.brz_wholesale_orders
-GROUP BY ALL ORDER BY _load_date;
+-- Bronze theo batch
+SELECT _load_date, _batch_id, count(*) AS rows FROM brz.brz_wholesale_orders GROUP BY ALL ORDER BY 1;
 
-SELECT * FROM meta.state_watermark ORDER BY load_date, source_system, entity;
+-- Cửa sổ đã đọc
+SELECT load_date, run_mode, source_system, entity, window_start, window_end,
+       watermark_before, watermark_after, source_file_path, bronze_row_count, status
+FROM meta.ingestion_batch ORDER BY started_at_utc;
+
+SELECT * FROM meta.watermark_state ORDER BY source_system, entity;
+SELECT * FROM meta.pipeline_run ORDER BY started_at_utc;
+
+-- T2: checksum trước/sau rerun — chỉ trên cột nghiệp vụ + batch
+-- (_run_id, _ingested_at đổi theo lượt rerun là đúng: cho biết lần ghi gần nhất)
+SELECT count(*) AS n, sum(xxhash64(_batch_id, _source_file, order_no, product_code, order_status, updated_at)) AS checksum
+FROM brz.brz_retail_orders;
 ```
 
-Số dòng phía nguồn: trong ws Source → `sqldb_erp_wholesale` → New query → `SELECT count(*) FROM dbo.orders`.
+Phía nguồn (ws Source → `sqldb_erp_wholesale` → New query):
+```sql
+SELECT count(*) AS n, sum(CASE WHEN updated_at > SYSUTCDATETIME() THEN 1 ELSE 0 END) AS future_rows FROM dbo.orders;
+```
+→ `n − future_rows` phải bằng số dòng `brz_wholesale_orders` sau T1.
 
 ## Xong Bước 1 khi
-T1–T4 đều đạt → cập nhật trạng thái trong [README](README.md) và [PLAN §15](../../PLAN.md#15-roadmap-từng-bước).
+T1–T4 đạt → cập nhật trạng thái ở [README](README.md), [PLAN §5](../../PLAN.md#5-roadmap-end-to-end) → Commit.
