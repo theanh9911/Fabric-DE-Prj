@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "nb_00_sim_daily",
+    "description": "Release one window of source data into the ERP and the retail drop"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "6dd85c89-41aa-4720-9d26-2a2d5f68fcc9"
+  }
+}
