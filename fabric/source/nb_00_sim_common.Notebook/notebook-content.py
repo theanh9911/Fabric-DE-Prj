@@ -12,8 +12,8 @@
 # MARKDOWN ********************
 
 # # nb_00_sim_common
-# # Thư viện dùng chung của **Source simulator** (`%run nb_00_sim_common`).
-# # - **Mục đích:** config + hàm cho các notebook `nb_00_sim_*` — một chỗ duy nhất (P4).
+# Thư viện dùng chung của **Source simulator** (`%run nb_00_sim_common`).
+# - **Mục đích:** config + hàm cho các notebook `nb_00_sim_*` — một chỗ duy nhất (P4).
 # - **Không** chứa logic chạy; chỉ định nghĩa.
 # - **Ranh giới:** chỉ ghi vào `sqldb_erp_wholesale`, `lh_retail_drop`, `lh_sim` (workspace Source).
 
@@ -107,8 +107,14 @@ EPOCH = dt.date(1900, 1, 1)
 _WORKSPACE_ID = notebookutils.runtime.context["currentWorkspaceId"]
 
 
+@lru_cache(maxsize=None)
+def _lakehouse_id(lakehouse: str) -> str:
+    return fabric.resolve_item_id(lakehouse, type="Lakehouse", workspace=_WORKSPACE_ID)
+
+
 def lakehouse_path(lakehouse: str, sub_path: str) -> str:
-    return f"abfss://{_WORKSPACE_ID}@onelake.dfs.fabric.microsoft.com/{lakehouse}.Lakehouse/{sub_path}"
+    # OneLake không cho trộn GUID workspace + tên item → dùng GUID cho cả hai
+    return f"abfss://{_WORKSPACE_ID}@onelake.dfs.fabric.microsoft.com/{_lakehouse_id(lakehouse)}/{sub_path}"
 
 
 def sim_table(name: str) -> str:

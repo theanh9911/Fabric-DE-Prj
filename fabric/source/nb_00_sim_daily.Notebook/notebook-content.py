@@ -12,7 +12,7 @@
 # MARKDOWN ********************
 
 # # nb_00_sim_daily
-# # - **Mục đích:** "hệ thống nguồn" phát sinh dữ liệu theo **virtual clock** — release mọi dòng seed có
+# - **Mục đích:** "hệ thống nguồn" phát sinh dữ liệu theo **virtual clock** — release mọi dòng seed có
 #   `_release_date` trong cửa sổ `(released_until, released_until + p_days]`.
 # - **Virtual clock:** ngày giả lập lưu trong `lh_sim.sim_state`, độc lập với ngày thật. Data giữ nguyên ngày gốc.
 # - **Wholesale → `sqldb_erp_wholesale`:** master MERGE, orders xoá-rồi-chèn theo cửa sổ `updated_at`.
@@ -40,7 +40,7 @@ p_sim_date = ""   # 'YYYY-MM-DD' — (tuỳ chọn) nhảy tới đúng ngày n�
 
 # CELL ********************
 
-%run nb_00_sim_common%run nb_00_sim_common
+%run nb_00_sim_common
 
 # METADATA ********************
 

@@ -19,7 +19,7 @@
 
 # CELL ********************
 
-%run nb_00_sim_common%run nb_00_sim_common
+%run nb_00_sim_common
 
 # METADATA ********************
 
