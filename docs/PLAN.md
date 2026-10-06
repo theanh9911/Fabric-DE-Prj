@@ -2,7 +2,7 @@
 
 > Mô phỏng 1 dự án Data Engineering thật trên Microsoft Fabric, dựa trên đề *Data Engineer Case Study*.
 > Làm việc trên **Fabric web UI** + **Git (GitHub)**. Hướng **SQL-first**: biến đổi dữ liệu bằng Spark SQL; Python chỉ là "keo dán".
-> Trạng thái: **Source ✅ xong · Platform: Bước 0 ✅ → Bước 1** · Cập nhật: 2026-10-06
+> Trạng thái: **Source ✅ xong · Platform: Bước 0 ✅ → Bước 1 Ingest** (xem §15) · Cập nhật: 2026-10-06
 
 ---
 
@@ -430,21 +430,21 @@ Source → Bronze (rows Copy = rows Bronze) · Bronze → Silver (`in = out + qu
 
 > Mỗi bước nhỏ, xong → kiểm → bước tiếp. Lát cắt dọc **orders** chạy được trước, mở rộng sau.
 
-| Bước | Việc | Xong khi |
-|---|---|---|
-| **0. Nền** | `lh_platform` · `nb_setup_ddl` (schema + bảng meta) · `nb_setup_config` (cfg/ref) · `nb_common` (SQL function) · **spike** (§17.2) | bảng meta có dữ liệu config; SQL function gọi được từ `%%sql` |
-| **1. Khám phá (Q1)** | `docs/dq_findings.md` — liệt kê lỗi + query phát hiện (chạy trên Bronze/Source) | mỗi lỗi có query + cách xử lý + rule |
-| **2. Ingest** | connection SQL DB · `pl_ingest` · `nb_brz_load` · watermark/manifest | chạy 2 lần cùng ngày → Bronze không đổi |
-| **3. Orders end-to-end** | `slv_orders_*` · Gold tối thiểu (`gld_d_date`, dim chỉ unknown member, `gld_f_sales_line`) · `nb_run_layer` · log · DQ cơ bản · 1 trang report | 7 ngày giả lập chạy tự động; **tag `v0.1`** |
-| **4. Master** | customer, product, category, hierarchy (Silver + Gold SCD1) | recon xanh |
-| **5. SCD2 + Gold đủ** | `gld_d_salesman` (Q7, Q11), `gld_a_sales_month` | SCD2 không chồng lấp |
-| **6. DQ + recon đủ** | rule §11.3, recon §11.4, thông báo | lỗi bơm vào bị bắt đúng |
-| **7. Vận hành** | `pl_backfill`, `pl_maintenance`, `pl_sim_drive`, kiểm idempotency/rebuild | chạy lại & rebuild ra cùng kết quả |
-| **8. Report** | `sm_sales`, `rpt_sales`, `rpt_pipeline_health` | report = SQL = recon |
-| **9. Prod** | PR `dev → main`, Prod Update, setup, backfill | **tag `v1.0`** |
-| **10. Drill** | simulator nâng cao + drill §14 + runbook | **tag `v1.1`** |
-| **11. SQL đề** | `sql/answers/` Q5, Q6, Q7, Q17 (+ Part II) | |
-| **12. Nộp bài** | PPT, diagram, README | |
+| Bước | Việc | Xong khi | Trạng thái |
+|---|---|---|---|
+| **0. Nền** | `lh_platform` · `nb_setup_ddl` (schema + bảng meta) · `nb_setup_config` (cfg/ref) · `nb_common` (SQL function) · **spike** (§17.2) | bảng meta có dữ liệu config; SQL function gọi được từ `%%sql` | ✅ 2026-10-06 |
+| **1. Ingest** | connection SQL DB · `pl_ingest` · `nb_brz_load` · watermark/manifest · spike K4 | chạy 2 lần cùng ngày → Bronze không đổi | ▶ đang làm |
+| **2. Khám phá (Q1)** | `docs/dq_findings.md` — EDA trên `brz.*` (đúng dữ liệu Platform nhận); query phát hiện dùng lại làm DQ rule | mỗi lỗi có query + cách xử lý + rule; `ref_value_mapping` đủ | |
+| **3. Orders end-to-end** | `slv_orders_*` · Gold tối thiểu (`gld_d_date`, dim chỉ unknown member, `gld_f_sales_line`) · `nb_run_layer` · log · DQ cơ bản · 1 trang report | 7 ngày giả lập chạy tự động; **tag `v0.1`** | |
+| **4. Master** | customer, product, category, hierarchy (Silver + Gold SCD1) | recon xanh | |
+| **5. SCD2 + Gold đủ** | `gld_d_salesman` (Q7, Q11), `gld_a_sales_month` | SCD2 không chồng lấp | |
+| **6. DQ + recon đủ** | rule §11.3, recon §11.4, thông báo | lỗi bơm vào bị bắt đúng | |
+| **7. Vận hành** | `pl_backfill`, `pl_maintenance`, `pl_sim_drive`, kiểm idempotency/rebuild | chạy lại & rebuild ra cùng kết quả | |
+| **8. Report** | `sm_sales`, `rpt_sales`, `rpt_pipeline_health` | report = SQL = recon | |
+| **9. Prod** | PR `dev → main`, Prod Update, setup, backfill | **tag `v1.0`** | |
+| **10. Drill** | simulator nâng cao + drill §14 + runbook | **tag `v1.1`** | |
+| **11. SQL đề** | `sql/answers/` Q5, Q6, Q7, Q17 (+ Part II) | | |
+| **12. Nộp bài** | PPT, diagram, README | | |
 
 ---
 
@@ -452,7 +452,7 @@ Source → Bronze (rows Copy = rows Bronze) · Bronze → Silver (`in = out + qu
 
 | Q | Phần | Q | Phần |
 |---|---|---|---|
-| Q1 | Bước 1, `dq_findings.md` | Q10 | §9 `slv_orders_current` (PySpark) |
+| Q1 | Bước 2, `dq_findings.md` | Q10 | §9 `slv_orders_current` (PySpark) |
 | Q2 | §2, §8–10 | Q11 | §10 SCD2 |
 | Q3, Q4 | §10, §8–9, ADR 001 | Q12 | §13 |
 | Q5–Q7 | `sql/answers/` | Q13 | §6, §11 |
@@ -480,7 +480,7 @@ Source → Bronze (rows Copy = rows Bronze) · Bronze → Silver (`in = out + qu
 | K1 | Spark 4.1 trên Fabric có **SQL function** (`CREATE TEMPORARY FUNCTION … RETURN <biểu thức>`) | đăng ký cùng tên bằng Python UDF trong `nb_common` (SQL gọi y hệt) | ✅ chạy được |
 | K2 | `%%configure` default lakehouse theo **tên** chạy được, kể cả notebook con trong `runMultiple` | gắn lakehouse trong runner, notebook con kế thừa session | ⚠️ chạy được ở **standard session**; **lỗi trong high-concurrency session** → tắt HC cho notebook; pipeline/runMultiple còn phải kiểm |
 | K3 | Định dạng Git của cell `%%sql` | tạo 1 notebook mẫu trên UI → Commit → xem file | ✅ cell magic lưu dạng `# MAGIC %%sql …`, metadata `"language": "sparksql"`; `%run` để nguyên dạng thô |
-| K4 | Pipeline Lookup đọc `meta.*` của lakehouse; Copy đọc Fabric SQL DB | dùng notebook nhỏ thay Lookup | ⏳ kiểm ở Bước 2 |
+| K4 | Pipeline Lookup đọc `meta.*` của lakehouse; Copy đọc Fabric SQL DB | dùng notebook nhỏ thay Lookup | ⏳ kiểm ở Bước 1 |
 
 ### 17.3 ADR
 
