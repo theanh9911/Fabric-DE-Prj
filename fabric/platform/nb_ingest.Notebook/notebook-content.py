@@ -32,7 +32,7 @@ import json
 from datetime import datetime, timezone
 from pyspark.sql import functions as F
 
-from notebookutils import fabric
+import sempy.fabric as fabric
 
 current_ws = notebookutils.runtime.context["currentWorkspaceId"]
 client = fabric.FabricRestClient()
