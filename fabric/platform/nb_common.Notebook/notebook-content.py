@@ -26,6 +26,7 @@ import json
 import re
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from functools import reduce
 
 from pyspark.sql import DataFrame, Window
@@ -126,8 +127,12 @@ def log_check(run_id, batch_id, check_id, check_type, table_name, grain_value,
     schema = ("run_id string, batch_id string, check_id string, check_type string, table_name string, "
               "grain_value string, expected decimal(38,4), actual decimal(38,4), threshold decimal(38,4), "
               "severity string, status string, sample_keys string, checked_at_utc timestamp")
+    # PySpark's explicit DecimalType schema does not accept Python ints/floats.
+    # Convert numeric check values before creating the row (preserve NULLs).
+    decimal_value = lambda value: Decimal(str(value)) if value is not None else None
     row = [(run_id, batch_id, check_id, check_type, table_name, grain_value,
-            expected, actual, threshold, severity, status, sample_keys, utc_now())]
+            decimal_value(expected), decimal_value(actual), decimal_value(threshold),
+            severity, status, sample_keys, utc_now())]
     spark.createDataFrame(row, schema).write.format("delta").mode("append").saveAsTable("meta.check_result")
     if status == "FAIL" and severity == "critical":
         raise ValueError(f"Critical check failed: {check_id}, expected={expected}, actual={actual}")
