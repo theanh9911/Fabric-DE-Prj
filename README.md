@@ -1,44 +1,41 @@
 # Fabric-DE-Prj — Company A Sales Data Platform
 
-Mô phỏng một dự án Data Engineering **thật** trên Microsoft Fabric — dựa trên đề *Data Engineer Case Study* — để luyện các năng lực production: tách hệ thống nguồn khỏi data platform, ingest chạy lại được và truy vết được, medallion (Bronze/Silver/Gold), DQ + đối soát, log + cảnh báo + khôi phục, Git + promote Dev → Prod.
+Mô phỏng dự án Data Engineering trên Microsoft Fabric theo hướng production. Kiến trúc hiện hành ở [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Landing là raw bất biến duy nhất, không có bảng Bronze; dữ liệu đi qua Silver, Gold, DQ/đối soát và semantic/report.
 
-Hướng triển khai **SQL-first**: biến đổi bằng Spark SQL; Python chỉ là keo dán; ingest bằng pipeline Copy.
-
-**Trạng thái:** Source ✅ · Nền ✅ · Ingest ▶ — chi tiết ở [docs/PLAN.md](docs/PLAN.md#5-roadmap-end-to-end).
+**Trạng thái:** Source simulator đã có; platform code đang được dựng theo architecture mới. Xem [docs/platform-implementation.md](docs/platform-implementation.md) để biết item, thứ tự deploy và các phần còn cần bind trong Fabric.
 
 ## Kiến trúc
 
-```
-CompanyA-Source (hệ thống "team khác", chỉ đọc)          CompanyA-DataPlatform-<Dev|Prod>
-  ERP sqldb_erp_wholesale ─┐                               lh_platform
-  Drop zone lh_retail_drop ┼── Pipeline Copy ──────────▶     Files/landing  (raw, bất biến)
-  Simulator (virtual clock)┘                                  brz → slv → gld  (medallion)
-                                                              meta            (config, watermark, log, DQ, recon)
-                                                            Semantic model + report
+```text
+CompanyA-Source (chỉ đọc)                    CompanyA-DataPlatform-<Dev|Prod>
+  ERP SQL Database ─┐                         lh_platform
+  Drop zone ─────────┼─ ingest ─────────────▶   Files/landing (raw bất biến + manifest)
+  Simulator ─────────┘                           slv → gld → meta audit/checks
+                                                Direct Lake semantic model + reports
 ```
 
 ## Tài liệu
 
 | Đọc | Để |
 |---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Mục tiêu, nguyên tắc, kiến trúc, đánh giá hiện trạng, roadmap |
-| [docs/design/](docs/design/README.md) | Thiết kế chi tiết từng phần: source contract, simulator, ingest, control tables, Bronze, Silver, Gold, DQ/recon, vận hành, môi trường |
-| [docs/guide/](docs/guide/README.md) | Thao tác click-by-click từng bước, kết quả mong đợi, lỗi đã gặp |
-
-Người mới: đọc PLAN §1–4 → [guide/source.md](docs/guide/source.md) → [guide/khai-niem.md](docs/guide/khai-niem.md) → guide của bước đang làm.
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Nguồn sự thật về kiến trúc và quy tắc triển khai |
+| [docs/platform-implementation.md](docs/platform-implementation.md) | Item hiện có, cách deploy, giới hạn cần xác minh trên Fabric |
+| [docs/PLAN.md](docs/PLAN.md) | Kế hoạch bản trước; đang được đồng bộ dần |
+| [docs/design/](docs/design/README.md) | Thiết kế chi tiết cũ; đối chiếu với architecture mới |
+| [docs/guide/](docs/guide/README.md) | Hướng dẫn thao tác đang chuyển từ Bronze sang Landing → Silver |
 
 ## Cấu trúc repo
 
 | Thư mục | Nội dung |
 |---|---|
-| `fabric/source/` | Workspace `CompanyA-Source` (Git sync): ERP (SQL project), drop zone, lakehouse simulator, notebook `nb_00_sim_*` |
-| `fabric/platform/` | Workspace `CompanyA-DataPlatform-<Dev\|Prod>` (Git sync): `lh_platform`, notebook `nb_*`, pipeline `pl_*` |
-| `docs/` | PLAN, design, guide |
+| `fabric/source/` | Workspace nguồn mô phỏng: SQL project, drop zone, lakehouse và simulator notebooks |
+| `fabric/platform/` | Lakehouse, notebooks và pipelines của data platform |
+| `docs/` | Architecture, kế hoạch, source contract và hướng dẫn vận hành |
 
-## Môi trường
+## Workspace
 
 | Workspace | Nhánh | Thư mục |
 |---|---|---|
 | `CompanyA-Source` | `dev` | `fabric/source` |
 | `CompanyA-DataPlatform-Dev` | `dev` | `fabric/platform` |
-| `CompanyA-DataPlatform-Prod` | `main` | `fabric/platform` (nối ở bước promote) |
+| `CompanyA-DataPlatform-Prod` | `main` | `fabric/platform` |

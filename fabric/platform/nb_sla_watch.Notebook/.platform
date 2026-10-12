@@ -1,0 +1,5 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {"type": "Notebook", "displayName": "nb_sla_watch"},
+  "config": {"version": "2.0", "logicalId": "0f5732c6-3b60-4f34-b4b5-530f8a2b5011"}
+}

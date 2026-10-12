@@ -1,1 +1,35 @@
-This is an auto-created file for fabric/platform
+# Data Platform Fabric items
+
+This folder is the deployable source for the Company A Data Platform workspace.
+The current architecture is `docs/ARCHITECTURE.md`; Landing is the raw layer and
+there is no Bronze Delta table.
+
+## Main flow
+
+`pl_master_daily` invokes `pl_daily_core`, which runs `nb_ingest_plan`,
+`nb_ingest`, and `nb_process`. Processing writes source-specific Silver tables,
+the shared order event and snapshot history, Gold dimensions/fact/aggregate,
+quarantine, and DQ/reconciliation results.
+
+## Notebooks
+
+- `nb_setup_ddl`: schemas and three metadata tables.
+- `nb_config`: versioned `SOURCES` and `TABLES` configuration.
+- `nb_common`: Delta, landing, audit, check, and quarantine helpers.
+- `nb_ingest_plan` / `nb_ingest`: source windows, SQL/file delivery, immutable Landing and manifests.
+- `nb_slv_load`: delivery replay, technical quarantine, current Silver and append-only event/snapshot history.
+- `nb_gld_dims` / `nb_gld_fact`: dimensions, SCD2 history, sales fact and monthly aggregate.
+- `nb_dq` / `nb_ops_recon`: critical checks and reconciliation.
+- `nb_sla_watch`: missing daily delivery warning; `nb_maintenance`: Delta OPTIMIZE.
+- `nb_process`: normal/rerun selection and processing order.
+
+## Workspace binding
+
+The source workspace, SQL Database and drop-zone Lakehouse are pipeline parameters
+(`CompanyA-Source`, `sqldb_erp_wholesale`, `lh_retail_drop` by default). The
+executing identity needs read access to those items and write access to
+`lh_platform`. Pipeline activity workspace IDs are Git placeholders and must be
+bound by Fabric Git integration in the target workspace.
+
+Semantic model/report items are not yet present in this folder. Add and bind them
+after the Gold schema has been deployed and inspected in the target workspace.
