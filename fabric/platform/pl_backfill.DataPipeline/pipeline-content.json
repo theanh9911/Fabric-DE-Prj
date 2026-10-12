@@ -62,7 +62,7 @@
           "activities": [
             {
               "name": "run_master_daily",
-              "type": "Notebook",
+              "type": "TridentNotebook",
               "dependsOn": [],
               "policy": {
                 "timeout": "0.12:00:00",

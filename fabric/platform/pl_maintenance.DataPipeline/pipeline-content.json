@@ -1,7 +1,7 @@
 {
   "properties": {
     "activities": [{
-      "name": "optimize_delta_tables", "type": "Notebook", "dependsOn": [],
+      "name": "optimize_delta_tables", "type": "TridentNotebook", "dependsOn": [],
       "policy": {"timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60},
       "typeProperties": {
         "notebookId": "dc93d0ee-55ee-44c3-9aa1-d5fb35e2d012",
