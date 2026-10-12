@@ -13,11 +13,12 @@
     },
     "activities": [
       {
-        "name": "run_core", "type": "InvokePipeline", "dependsOn": [],
+        "name": "run_core", "type": "ExecutePipeline", "dependsOn": [],
         "policy": {"timeout": "0.02:00:00", "retry": 0, "retryIntervalInSeconds": 30},
         "typeProperties": {
-          "pipeline": {"referenceName": "pl_daily_core", "type": "PipelineReference"},
+          "pipeline": {"referenceName": "c9e5553b-75f2-a23c-4fe7-a442ba666570", "type": "PipelineReference"},
           "waitOnCompletion": true,
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
           "parameters": {
             "p_load_date": {"value": {"value": "@pipeline().parameters.p_load_date", "type": "Expression"}, "type": "string"},
             "p_load_date_to": {"value": {"value": "@pipeline().parameters.p_load_date_to", "type": "Expression"}, "type": "string"},

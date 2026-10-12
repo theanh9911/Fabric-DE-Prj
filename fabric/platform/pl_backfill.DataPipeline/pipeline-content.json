@@ -25,10 +25,12 @@
           "items": {"value": "@variables('v_dates')", "type": "Expression"},
           "activities": [
             {
-              "name": "run_master_daily", "type": "InvokePipeline", "dependsOn": [],
+              "name": "run_master_daily", "type": "ExecutePipeline", "dependsOn": [],
+              "policy": {"timeout": "0.12:00:00", "retry": 0, "retryIntervalInSeconds": 30},
               "typeProperties": {
-                "pipeline": {"referenceName": "pl_master_daily", "type": "PipelineReference"},
+                "pipeline": {"referenceName": "8e1de8bc-337d-45d8-b442-2305b3d34009", "type": "PipelineReference"},
                 "waitOnCompletion": true,
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
                 "parameters": {
                   "p_load_date": {"value": {"value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')", "type": "Expression"}, "type": "string"},
                   "p_load_date_to": {"value": {"value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')", "type": "Expression"}, "type": "string"},
