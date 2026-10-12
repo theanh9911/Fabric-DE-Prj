@@ -42,6 +42,11 @@ p_drop_lakehouse = "lh_retail_drop"
 import json
 from pyspark.sql import functions as F
 
+def run_child_notebook(name, timeout_seconds, arguments):
+    # Pass the current workspace Lakehouse through even if child binding metadata differs.
+    return notebookutils.notebook.run(name, timeout_seconds, {
+        **arguments, "useRootDefaultLakehouse": True})
+
 run_id = p_run_id or str(uuid.uuid4())
 batch_from = p_load_date.replace("-", "") if p_load_date else None
 batch_to = p_load_date_to.replace("-", "") if p_load_date_to else batch_from
@@ -49,7 +54,7 @@ ingest_error = None
 
 # One pipeline Notebook activity owns the Spark session. Nested notebooks inherit its pool.
 if p_mode == "normal" and p_from_layer == "ingest":
-    plan_json = notebookutils.notebook.run("nb_ingest_plan", 900, {
+    plan_json = run_child_notebook("nb_ingest_plan", 900, {
         "p_load_date": p_load_date, "p_window_start": "", "p_window_end": "",
         "p_entities": p_entities, "p_mode": p_mode, "p_from_layer": p_from_layer})
     plan_doc = json.loads(plan_json)
@@ -59,7 +64,7 @@ if p_mode == "normal" and p_from_layer == "ingest":
     run_id = plan_doc["run_id"]
     if plan_doc.get("sources"):
         try:
-            notebookutils.notebook.run("nb_ingest", 3600, {
+            run_child_notebook("nb_ingest", 3600, {
                 "p_plan_json": plan_json,
                 "p_source_workspace": p_source_workspace,
                 "p_erp_item": p_erp_item,
@@ -78,7 +83,7 @@ pending = [m for m in list_delivery_manifests(batch_from, batch_to)
            if (p_mode == "rerun" or not already_loaded(m)) and
            any(s["source_system"] == m["source_system"] and s["entity"] == m["entity"] for s in source_selected)]
 if p_from_layer in ("ingest", "slv") and pending:
-    result = notebookutils.notebook.run("nb_slv_load", 7200, {
+    result = run_child_notebook("nb_slv_load", 7200, {
         "p_run_id": run_id, "p_mode": p_mode, "p_load_date": p_load_date,
         "p_load_date_to": p_load_date_to, "p_entities": p_entities,
         "p_full_reload": p_full_reload})
@@ -108,9 +113,9 @@ if gold_changed and p_from_layer in ("ingest", "slv", "gld"):
     log_table_run(run_id, "gld", "gld.gld_f_sales_line", "STARTED", batch_from, batch_to, p_mode)
     try:
         # Deterministic rebuild from Silver current + append-only snapshot history.
-        notebookutils.notebook.run("nb_gld_dims", 7200, {
+        run_child_notebook("nb_gld_dims", 7200, {
             "p_run_id": run_id, "p_entities": p_entities, "p_full_reload": p_full_reload})
-        gold_result = notebookutils.notebook.run("nb_gld_fact", 7200, {
+        gold_result = run_child_notebook("nb_gld_fact", 7200, {
             "p_run_id": run_id, "p_batch_from": batch_from or "", "p_batch_to": batch_to or "",
             "p_mode": p_mode, "p_full_reload": p_full_reload})
         log_table_run(run_id, "gld", "gld.gld_f_sales_line", "SUCCEEDED", batch_from, batch_to,
@@ -120,9 +125,9 @@ if gold_changed and p_from_layer in ("ingest", "slv", "gld"):
                       p_mode, source_versions=current_versions, error=str(exc))
         raise
 
-dq_result = notebookutils.notebook.run("nb_dq", 3600, {
+dq_result = run_child_notebook("nb_dq", 3600, {
     "p_run_id": run_id, "p_batch_id": batch_from or "", "p_layer": "all"})
-recon_result = notebookutils.notebook.run("nb_ops_recon", 3600, {
+recon_result = run_child_notebook("nb_ops_recon", 3600, {
     "p_run_id": run_id, "p_batch_id": batch_from or ""})
 
 if ingest_error:
