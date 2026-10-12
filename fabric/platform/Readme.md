@@ -12,6 +12,12 @@ Processing writes source-specific Silver tables,
 the shared order event and snapshot history, Gold dimensions/fact/aggregate,
 quarantine, and DQ/reconciliation results.
 
+Operational parameters and recovery procedures for `pl_master_daily` are in
+[`RUNBOOK.md`](RUNBOOK.md). The source/file/table/notebook dependency matrix and
+manual execution order are in [`DEPENDENCIES.md`](DEPENDENCIES.md). Use those
+guides to select a date range or restart from a layer; in particular, a `rerun`
+replays Landing manifests and does not perform a new source ingest.
+
 ## Notebooks
 
 - `nb_setup_ddl`: schemas and three metadata tables.

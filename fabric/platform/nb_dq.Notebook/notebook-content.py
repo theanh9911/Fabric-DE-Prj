@@ -14,6 +14,7 @@
 p_run_id = ""
 p_batch_id = ""
 p_layer = "all"
+p_entities = "ALL"
 
 # METADATA ********************
 
@@ -75,11 +76,17 @@ def check_not_null(table, columns, check_id):
     results.append((check_id, status))
 
 if p_layer in ("all", "slv"):
-    for source in SOURCES:
+    selected_sources = SOURCES
+    if p_entities != "ALL":
+        requested = {x.strip() for x in p_entities.split(",") if x.strip()}
+        selected_sources = [s for s in SOURCES
+                            if f"{s['source_system']}.{s['entity']}" in requested]
+    for source in selected_sources:
         table = f"slv.slv_{source['source_system']}_{source['entity']}"
         if table_exists(table):
             check_not_null(table, ["_bk"], f"{table}.business_key_not_null")
-    if table_exists("slv.slv_orders_event"):
+    if (p_entities == "ALL" or any(
+            x.strip().endswith(".orders") for x in p_entities.split(","))) and table_exists("slv.slv_orders_event"):
         check_unique("slv.slv_orders_event", ["source_system", "_bk", "order_status", "_updated_at_utc"],
                      "slv_orders_event.event_key_unique")
 
@@ -115,4 +122,6 @@ if table_exists("slv.quarantine"):
     results.append(("slv.quarantine.open_count", open_count))
 
 notebookutils.notebook.exit(json.dumps({"run_id": run_id, "checks": results,
-                                        "quarantine_rows": open_count if table_exists("slv.quarantine") else 0}))
+                                        "quarantine_rows": open_count if table_exists("slv.quarantine") else 0,
+                                        "checked_layer": p_layer,
+                                        "entities": p_entities}))

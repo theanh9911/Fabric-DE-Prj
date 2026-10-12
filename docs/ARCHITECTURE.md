@@ -3,7 +3,19 @@
 > **Bản thi công end-to-end cho dự án thật.** Làm theo từ trên xuống là ra hệ thống chạy production: có những item nào; mỗi tầng ghi bằng lệnh gì; job nào chạy trước, chạy sau; fail ở đâu thì biết bằng cách nào và xử lý ra sao; chạy hằng ngày, chạy lại, nạp lần đầu, backfill thế nào.
 > Ví dụ trong file dùng dữ liệu Company A (ERP bán buôn + file bán lẻ). Phần chỉ áp dụng cho môi trường **mô phỏng** nằm ở **Phụ lục A**.
 > **File này là nguồn sự thật hiện hành về kiến trúc.** PLAN.md và design/ mô tả bản trước (có Bronze dạng bảng, `meta` 5 bảng, Lookup T-SQL); khi làm đến phần nào thì cập nhật file tương ứng theo §15.
-> Trạng thái: architecture hiện hành; platform implementation đang được dựng trong `fabric/platform/` · 2026-10-12
+> Trạng thái: architecture mục tiêu; một số chi tiết điều phối bên dưới chưa khớp với code deployable hiện tại · 2026-10-12
+
+> **Implementation note (2026-10-12):** Với code trong `fabric/platform/`,
+> `pl_master_daily` chạy một activity `run_process`; `nb_process` gọi tuần tự
+> notebook con bằng `notebookutils.notebook.run`. `p_entities` hiện nhận `ALL`
+> hoặc source IDs (`retail.orders`, `wholesale.orders`, ...), chưa hỗ trợ chọn
+> riêng bảng Gold. Partial run chỉ kiểm DQ Silver theo source đã chọn và bỏ qua
+> reconciliation đầy đủ; dùng `p_entities=ALL` để kiểm tra end-to-end. Tham số
+> recovery và trạng thái thực tế được mô tả trong
+> [`fabric/platform/RUNBOOK.md`](../fabric/platform/RUNBOOK.md); ma trận dependency
+> source/file/table/notebook và thứ tự chạy trong
+> [`fabric/platform/DEPENDENCIES.md`](../fabric/platform/DEPENDENCIES.md). Khi thiết kế
+> mục tiêu khác hành vi code, runbook/code deployable mô tả hành vi hiện tại.
 
 **Mục lục**
 1. Luật chơi · 2. Kiến trúc tổng thể · 3. Framework · 4. Ingest & Landing · 5. Silver · 6. Gold · 7. Semantic & refresh · 8. meta, DQ, đối soát · 9. Điều phối: dependency, fail, cảnh báo, lịch · 10. Sổ tay vận hành · 11. Hiệu năng, bảo trì, chi phí · 12. Môi trường, CI/CD, bảo mật & quản trị dữ liệu · 13. Núm vặn khi lớn lên · 14. Lộ trình & Definition of Done · 15. Quyết định & còn mở · Phụ lục A. Mô phỏng
