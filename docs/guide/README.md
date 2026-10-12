@@ -23,7 +23,7 @@
 
 | Bước | Thư mục | Trạng thái |
 |---|---|---|
-| 0. Nền | [00-nen/](00-nen/README.md) | ✅ (một phần được thay ở Bước 1) |
+| 0. Nền (lịch sử) | [00-nen/](00-nen/README.md) | ⚠️ tài liệu thao tác cũ; không dùng để chạy setup hiện tại |
 | 1. Ingest happy path | [01-ingest/](01-ingest/README.md) | ▶ |
 | 2. Source contract + EDA (Q1) | *viết khi tới* | |
 | 3. Orders end-to-end → `v0.1` | | |
@@ -37,4 +37,4 @@
 | **Xong 1 việc nhỏ → Commit ngay** | Git là bản lưu an toàn duy nhất |
 | **Đóng tab notebook trước khi Update all** | Tránh hộp thoại "Saved version / Your version" |
 | **1 phiên Spark mỗi lúc; xong thì Stop session** | Capacity trial nhỏ → lỗi 430 |
-| **Không sửa tay bảng `meta` trên Fabric** | Config sửa trong `nb_setup_config`; state/log do pipeline ghi |
+| **Không sửa tay bảng `meta` trên Fabric** | Config sửa trong `nb_setup_config`; audit dữ liệu do notebook ghi; log vận hành xem Monitoring hub |

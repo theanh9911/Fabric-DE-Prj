@@ -6,7 +6,7 @@
 
 | Quy tắc | Chi tiết |
 |---|---|
-| Append-only | Mỗi batch thêm vào; không sửa dữ liệu đã có (trừ thay batch khi rerun) |
+| Append theo batch | Mỗi batch mới được thêm; chỉ thay đúng batch đó bằng một commit Delta nguyên tử khi recovery/rerun |
 | Không làm sạch | Không trim, không parse, không dedup, không lọc dòng lỗi |
 | Giữ raw **theo khả năng của nguồn** | **ERP:** giữ kiểu gốc từ parquet (timestamp, decimal) — nguồn đã có kiểu, ép về chữ là mất thông tin vô ích. **CSV:** mọi cột string (file vốn là chữ; parse có chủ đích ở Silver) |
 | Mọi snapshot master được giữ | Nguồn lịch sử duy nhất cho SCD2 và phát hiện xoá |
@@ -29,10 +29,10 @@
 Partition: không partition lúc đầu (dữ liệu nhỏ). Xem lại ở bài đo hiệu năng (09 §5).
 
 ## 3. Idempotent
-- Ghi theo batch: `DELETE WHERE _batch_id = X` rồi append.
-- **Rerun** đọc lại đúng thư mục landing của batch đã COMMITTED và **giữ nguyên `batch_id`** → xoá rồi ghi lại đúng phần đó → Bronze y hệt. `ingestion_batch` thêm 1 dòng `run_mode = rerun` trỏ cùng `batch_id`.
-- File có `content_hash` trùng một file đã COMMITTED (gửi lại y hệt, bản copy khác tên, file lấy lại do lookback) → **không ghi Bronze**, `ingestion_batch.status = SKIPPED_DUPLICATE`.
-- Bước ghi Bronze + `ingestion_batch` COMMITTED + `watermark_state` theo thứ tự đó; lỗi giữa chừng → watermark chưa tiến → lần sau lấy lại.
+- Ghi theo batch bằng một thao tác Delta nguyên tử/idempotent. Không dùng `DELETE` rồi append như hai lệnh độc lập vì lỗi xen giữa có thể để Bronze mất batch. Cơ chế cụ thể phải được xác minh trên Fabric Runtime trước khi chốt notebook.
+- **Rerun/recovery** chọn đúng `p_batch_id`, đọc lại landing bất biến và **giữ nguyên `batch_id`**. `PREPARED` có thể thay phần batch trong Bronze bằng thao tác nguyên tử; `BRONZE_WRITTEN` chỉ hoàn tất watermark/audit. Với batch COMMITTED, rerun code phải cho kết quả y hệt. Mỗi attempt mới có `ingestion_batch_id` riêng và trỏ cùng `batch_id`.
+- File có `content_hash` trùng một file đã COMMITTED trong cùng `(source_system, entity)` (gửi lại y hệt, bản copy khác tên, file lấy lại do lookback) → **không ghi Bronze**, `ingestion_batch.status = SKIPPED_DUPLICATE`. Recovery/rerun theo đúng `batch_id` xử lý trước bước dedup toàn cục, để một file không tự loại chính nó.
+- Commit theo từng entity: ghi audit PREPARED → Bronze commit nguyên tử → audit BRONZE_WRITTEN → cập nhật watermark entity bằng MERGE không lùi → audit COMMITTED. Lỗi ở entity sau không rollback các entity đã commit; retry tiếp tục từ stage của entity đó. Nếu crash sau Bronze commit nhưng trước audit/checkpoint, batch cùng ID được ghi thay atomically rồi hoàn tất metadata, không append thêm.
 
 ## 4. Schema drift
 | Tình huống | Bronze | Silver/Gold |

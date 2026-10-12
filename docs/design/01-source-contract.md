@@ -43,8 +43,8 @@
 | Grain, khoá | như wholesale orders (không có `order_line_id`) |
 | Gửi lại | Gửi lại = **ghi đè cùng tên**. Storage gán LastModified = thời điểm ghi; nguồn **không** giữ thời gian sửa cũ → file gửi lại luôn có LastModified mới. File đến với LastModified cũ hơn 1 ngày là **vi phạm hợp đồng** (Platform không đảm bảo nhận) |
 | Hoàn tất | File được ghi 1 lần (atomic rename trong simulator); hệ thật có thể đang ghi dở → Platform chờ 5 phút sau LastModified (settle) |
-| Thời gian | LastModified là **giờ thật UTC** của storage (khác đồng hồ dữ liệu bên trong file) |
-| Thời gian | Không múi giờ → coi là **Asia/Ho_Chi_Minh** |
+| Thời gian file | LastModified là **giờ thật UTC** của storage (khác đồng hồ dữ liệu bên trong file) |
+| Thời gian dữ liệu | Timestamp trong CSV không có múi giờ → giả định **Asia/Ho_Chi_Minh**, cần xác minh ở EDA |
 
 ### customers / products / sales_hierarchy (retail) · categories (reference)
 | Mục | Hợp đồng |

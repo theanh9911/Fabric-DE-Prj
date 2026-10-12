@@ -9,7 +9,7 @@
 | Pipeline / activity: bắt đầu, kết thúc, trạng thái, thời lượng, lỗi, retry | **Fabric Monitoring hub** | Tra cứu khi debug; pipeline lỗi thì trạng thái Fabric là FAILED — không cần notebook ghi lại |
 | Copy output: `rowsRead`, `filesWritten`, dung lượng, throughput | **Fabric** (output activity) | Lưu vào `meta` chỉ khi đối soát **tự động** cần (Bước 6) |
 | Spark / notebook run, chẩn đoán | **Fabric** | |
-| Version bảng sau mỗi lần ghi | **Delta history** (`DESCRIBE HISTORY`) | Mỗi lần ghi gắn `run_id` vào `userMetadata` → tìm version theo run để RESTORE |
+| Version bảng sau mỗi lần ghi | **Delta history** (`DESCRIBE HISTORY`) | Mỗi lần ghi gắn `run_id`, `batch_id`, operation vào `userMetadata` → tìm version để RESTORE; xác minh config này trên Fabric Runtime |
 | Dữ liệu nào đã vào Bronze: cửa sổ, file, hash, `batch_id`, trạng thái | **`meta.ingestion_batch`** | Fabric không biết khái niệm này |
 | Mốc đã đọc tới đâu | **`meta.watermark_state`** | |
 | Rule DQ đã chạy, số lỗi, hành động | **`meta.dq_result`** (Bước 3) | |
@@ -24,7 +24,7 @@ Lý do giữ dài hạn trong `meta`: Monitoring hub có giới hạn thời gia
 |---|---|---|---|
 | `cfg_source_entity` | 1 entity nguồn | `nb_setup_config` (Git) | Bước 1.2 (sửa cột) |
 | `watermark_state` | trạng thái hiện hành của 1 entity | `nb_brz_load` | Bước 1.2 |
-| `ingestion_batch` | 1 lần thử ingest 1 entity (db) / 1 file / 1 entity không có gì mới | `nb_brz_load` | Bước 1.2 |
+| `ingestion_batch` | 1 entity batch (db) / 1 file / 1 entity không có gì mới; trạng thái của attempt được cập nhật qua các commit stage | `nb_brz_load` | Bước 1.2 |
 | `dq_result` | 1 lần đánh giá 1 rule | `nb_dq` | Bước 3 |
 | `reconciliation_result` | 1 phép đối soát | `nb_ops_recon` | Bước 3 / 6 |
 | `run_summary` *(tuỳ chọn)* | 1 lượt chạy end-to-end | notebook cuối `pl_master_daily` | Bước 8 nếu cần |
@@ -37,12 +37,12 @@ Bỏ so với các bản trước: `cfg_pipeline_step`, `cfg_dq_rule`, `ref_*` (
 |---|---|---|---|
 | `run_id` | 1 lượt chạy pipeline (khớp Monitoring hub) | không | RunId của Fabric |
 | `ingestion_batch_id` | 1 dòng `ingestion_batch` = 1 lần thử | không | uuid |
-| `batch_id` | **Dữ liệu** của 1 entity trong 1 lượt normal — thứ được replay | **có** | `retail_orders_20260102_ab12cd34` |
+| `batch_id` | **Dữ liệu** của 1 entity/window DB hoặc 1 file — thứ được replay | **có** | `retail_orders_20260102_ab12cd34_filehash` |
 | `landing_path` | Thư mục landing của `batch_id` | **có** | `Files/landing/retail/orders/load_date=2026-01-02/batch=<RunId>/` |
 | `load_date` | Ngày logic | có | `2026-01-02` |
 
-- `batch_id` sinh 1 lần ở lượt normal: `<source>_<entity>_<yyyymmdd>_<8 ký tự đầu RunId>`; Bronze `_batch_id` = giá trị này.
-- Tìm input để replay: `batch_id`, `status = COMMITTED`, `run_mode IN (normal, reprocess)`.
+- DB `batch_id` sinh một lần cho entity/window: `<source>_<entity>_<yyyymmdd>_<run-token>`. File thêm token ổn định cho từng file trong landing, để mỗi file có `_batch_id` riêng và atomic replace không ghi đè file khác. Rerun/recovery dùng lại ID đã đăng ký.
+- Tìm input để replay: `batch_id` và `landing_path` đã đăng ký; với rerun theo `load_date`, lấy batch PREPARED/BRONZE_WRITTEN cần recovery cùng các batch COMMITTED thuộc ngày đó.
 
 ## 4. Cột
 
@@ -68,12 +68,13 @@ updated_at_utc
 ```
 **Không bao giờ lùi:** `watermark mới = max(watermark hiện tại, giá trị của batch)` (design/03 §3).
 
-### `ingestion_batch` — append-only, 1 dòng / lần thử
+### `ingestion_batch` — audit dữ liệu, 1 dòng / entity batch hoặc file attempt
 ```
 ingestion_batch_id       khoá, uuid
 batch_id                 định danh dữ liệu (ổn định khi rerun)
 run_id, load_date
 run_mode                 normal | rerun | reprocess
+attempt_number           thứ tự retry của cùng batch_id
 source_system, entity, load_strategy
 window_start, window_end
 watermark_before, watermark_after
@@ -83,12 +84,13 @@ landing_file_size
 content_hash             file: sha2 nội dung → nhận file trùng
 bronze_row_count
 schema_changes           cột mới / mất so với Bronze (schema drift), NULL nếu không
-status                   COMMITTED | SKIPPED_DUPLICATE | NO_NEW_DATA | FAILED
+status                   PREPARED | BRONZE_WRITTEN | COMMITTED | SKIPPED_DUPLICATE | NO_NEW_DATA
 started_at_utc, committed_at_utc
 error_message
 ```
-- `NO_NEW_DATA`: entity không có gì mới vẫn có 1 dòng → freshness biết "đã kiểm, không có gì" khác "chưa chạy".
-- `SKIPPED_DUPLICATE`: file có `content_hash` trùng file đã COMMITTED → không vào Bronze.
+- Một dòng audit được MERGE theo `ingestion_batch_id` qua trạng thái `PREPARED → BRONZE_WRITTEN → COMMITTED`; lần thử mới có `ingestion_batch_id` mới. `PREPARED` và `BRONZE_WRITTEN` cho phép recovery sau crash. Khi lỗi, giữ nguyên stage và điền `error_message`; Fabric Monitoring hub là nơi giữ trạng thái FAILED của activity/pipeline.
+- `NO_NEW_DATA`: entity không có gì mới vẫn có 1 dòng cuối → freshness biết "đã kiểm, không có gì" khác "chưa chạy".
+- `SKIPPED_DUPLICATE`: file có `content_hash` trùng file khác đã COMMITTED trong cùng source/entity → không vào Bronze.
 - Cột Copy output (`copy_rows_read`, `copy_files_written`) **chưa thêm**; thêm ở Bước 6 nếu đối soát tự động cần (spike K7).
 
 ### `dq_result` — append-only (Bước 3)
@@ -108,15 +110,16 @@ source_value, target_value, difference, tolerance, status, checked_at_utc
 ```
 pl_ingest (run_id = R)                                   Monitoring hub: trạng thái pipeline/activity
  └ nb_brz_load
-     ├ mỗi entity / file → ingestion_batch (COMMITTED | SKIPPED_DUPLICATE | NO_NEW_DATA | FAILED)
-     ├ ghi Bronze với userMetadata = R                    Delta history: version theo run
-     ├ mọi entity xong → watermark_state MERGE (không lùi)
-     └ lỗi → ghi FAILED rồi raise → activity & pipeline FAILED trên Fabric
+     ├ mỗi entity: ghi Bronze nguyên tử theo batch_id
+     ├ ingestion_batch: PREPARED → BRONZE_WRITTEN
+     ├ watermark_state MERGE ngay cho entity đó (không lùi)
+     ├ ingestion_batch → COMMITTED / SKIPPED_DUPLICATE / NO_NEW_DATA
+     └ lỗi entity → audit FAILED nếu ghi được, raise → activity & pipeline FAILED trên Fabric
 ```
 
 ## Quyết định
 - Log vận hành ở Fabric; `meta` chỉ audit dữ liệu (ingestion, watermark, DQ, recon). Bước 1 có 3 bảng.
-- RESTORE dựa vào Delta history + `userMetadata = run_id`.
+- RESTORE dựa vào Delta history; `userMetadata` cần bao gồm `run_id`, `batch_id` và operation nếu một run có nhiều commit trên cùng bảng. Khi tìm version khôi phục, chọn version tốt đã xác minh trước sự cố; một `run_id` có thể ánh xạ tới nhiều Delta version.
 
 ## Còn mở
 - `run_summary`: chỉ khi `rpt_pipeline_health` cần (Bước 8).

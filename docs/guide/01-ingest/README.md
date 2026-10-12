@@ -1,6 +1,6 @@
 # Bước 1 — Ingest happy path ▶
 
-**Mục tiêu:** `pl_ingest(p_load_date)` lấy phần mới của 9 nguồn → landing → Bronze; ghi audit dữ liệu (`ingestion_batch`); tiến watermark khi thành công (không lùi). Rerun → Bronze không đổi. Trạng thái chạy, thời lượng, lỗi: Monitoring hub.
+**Mục tiêu:** `pl_ingest(p_load_date)` lấy phần mới của 9 nguồn → landing → Bronze; audit theo stage trong `ingestion_batch`; tiến watermark sau commit từng entity (không lùi). Rerun/recovery dùng `p_batch_id` để giữ nguyên input. Trạng thái chạy, thời lượng, lỗi: Monitoring hub.
 
 Thiết kế: [design/03 ingest](../../design/03-ingest.md) · [04 control tables](../../design/04-control-tables.md) · [05 bronze](../../design/05-bronze.md).
 
@@ -22,7 +22,7 @@ set_run_start ─✓─▶ lkp_source_entity ─✓─▶ fe_source_entity ─�
 | `sw_source_type` | `db_*` → nhánh db · `file_*` → nhánh file |
 | `cp_db_to_landing` | ERP → parquet; full snapshot hoặc theo cửa sổ |
 | `cp_file_to_landing` | Chép nguyên file có LastModified trong cửa sổ |
-| `nb_brz_load` | landing → Bronze; ghi `ingestion_batch`, `watermark_state` (không lùi); lỗi → pipeline FAILED |
+| `nb_brz_load` | landing → Bronze; audit `PREPARED → BRONZE_WRITTEN → COMMITTED` và watermark theo từng entity; lỗi → pipeline FAILED |
 
 ## Việc (thứ tự làm)
 

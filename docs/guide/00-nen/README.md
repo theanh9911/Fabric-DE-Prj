@@ -15,8 +15,8 @@
 | | Sau Bước 0 (v2) | Sau Bước 1.2–1.4 (v4) |
 |---|---|---|
 | Schema | `brz`, `slv`, `gld`, `meta` | giữ |
-| Bảng `meta` | 13 bảng (cfg 3 · ref 3 · state 2 · log/dq/recon/registry 5), 10 bảng rỗng | **3 bảng:** `cfg_source_entity`, `watermark_state`, `ingestion_batch` (log vận hành xem ở Monitoring hub) |
+| Bảng `meta` | Bước 0 tạo schema/bảng theo thiết kế v2 cũ | Thiết kế ingest hiện hành có 3 bảng nền: `cfg_source_entity`, `watermark_state`, `ingestion_batch`; log vận hành xem ở Monitoring hub |
 | Luật nghiệp vụ | bảng `ref_order_status`, `ref_value_mapping` | SQL function trong `nb_common` |
 | Lý do đổi | — | [PLAN §2.2](../../PLAN.md#22-điều-chỉnh-v3--v4-sau-phản-biện), [design/04](../../design/04-control-tables.md) |
 
-**Dựng lại ở môi trường mới (vd Prod):** Update all từ Git → chạy `nb_setup_ddl` → chạy `nb_setup_config`. Hai notebook chạy lại bao nhiêu lần cũng được.
+**Dựng mới ở môi trường khác:** chỉ dùng hướng dẫn setup hiện hành sau khi Bước 1 chốt migration. DDL cấu trúc có thể rerun; migration/legacy cleanup là one-time, không chạy lặp lại trên Prod.

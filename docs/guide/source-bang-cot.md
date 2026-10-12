@@ -18,7 +18,7 @@ Mô phỏng hệ thống bán buôn. 4 bảng = mô hình bán hàng tối thi�
 | `gender` | NVARCHAR(20) | Giới tính — phân tích khách. ⚠️ nhiều cách viết → `std_gender()` trong `nb_common` (danh sách đúng: Bước 2) |
 | `address` | NVARCHAR(400) | Địa chỉ |
 | `created_at` | DATETIME2 | Lúc tạo khách ở ERP |
-| `updated_at` | DATETIME2 | Lúc sửa gần nhất — **cột watermark**. ⚠️ cho phép NULL → dòng NULL không bao giờ được lấy incremental |
+| `updated_at` | DATETIME2 | Lúc sửa gần nhất; có thể NULL. Master được đọc full snapshot nên cột này **không dùng làm watermark** |
 
 ### `dbo.products` — sản phẩm
 | Cột | Kiểu | Nghĩa · vì sao có |

@@ -42,12 +42,27 @@ Cột `cfg_source_entity.load_strategy` quyết định nhánh.
 - Settle (5 phút): bỏ qua file vừa sửa, có thể đang ghi dở.
 - Cửa sổ thực tế của mỗi lượt ghi vào `meta.ingestion_batch`.
 
+### Ghi nhận và khôi phục lỗi (quy tắc commit)
+Mỗi entity là một đơn vị commit độc lập; không đợi toàn bộ 9 entity mới ghi watermark.
+
+1. Copy tạo landing bất biến. DB có một batch cho mỗi entity/window; file có một batch cho mỗi file. Tạo audit `PREPARED` cho toàn bộ input của entity trước khi sửa Bronze.
+2. `nb_brz_load` đọc từng input và thay phần Bronze của đúng `batch_id` bằng một thao tác Delta nguyên tử; sau đó chuyển audit tương ứng sang `BRONZE_WRITTEN`.
+3. Chỉ khi mọi input của entity ở trạng thái cuối (COMMITTED/SKIPPED_DUPLICATE/NO_NEW_DATA) và không còn PREPARED/BRONZE_WRITTEN, MERGE watermark cho entity (không lùi), rồi chuyển các dòng BRONZE_WRITTEN sang COMMITTED. Duplicate đã xác nhận cũng được tính là đã xử lý.
+4. Watermark entity không tiến giữa chừng khi còn file chưa xử lý. Nếu process bị ngắt, retry cùng batch hoàn tất các input PREPARED/BRONZE_WRITTEN.
+5. Khi retry, `PREPARED` thì ghi lại cùng batch atomically; `BRONZE_WRITTEN` thì không ghi Bronze lần nữa, chỉ hoàn tất watermark và audit. `COMMITTED` thì bỏ qua hoặc chạy rerun có chủ đích.
+6. Nếu entity A commit xong nhưng entity B lỗi, A giữ checkpoint; B retry độc lập. Pipeline tổng thể vẫn FAILED trên Monitoring hub.
+
+`DELETE WHERE _batch_id = X` rồi append không được coi là atomic: lỗi giữa hai lệnh có thể làm mất batch. Ưu tiên Delta overwrite giới hạn bằng `replaceWhere` trên `_batch_id`; xác minh trên Fabric Runtime rằng thao tác tạo một commit nguyên tử. Nếu runtime không hỗ trợ đúng cách, chốt một phương án MERGE khác trước khi viết notebook.
+
+### Batch identity khi retry
+`batch_id` đại diện cho cùng một tập input, không đơn thuần cho lần chạy pipeline. Chốt quy tắc: recovery và rerun cùng input phải dùng lại landing + `batch_id`. `p_batch_id` là tùy chọn để replay riêng một batch; nếu bỏ trống, `rerun` lấy các batch của `p_load_date` còn cần recovery hoặc đã COMMITTED. Một lượt normal mới có cửa sổ/landing mới là batch mới và có thể tạo raw overlap do lookback; Silver dedup theo khóa + quy tắc phiên bản. `reprocess` chủ ý lấy lại nguồn thành batch mới, ghi rõ range.
+
 ## 4. Ba kiểu chạy
 
 | Kiểu (`p_mode`) | Khi nào | Lấy dữ liệu | Kết quả |
 |---|---|---|---|
-| **normal** | Lịch hằng ngày; hoặc sau lượt lỗi **trước khi COMMITTED** (watermark chưa tiến → tự lấy lại) | Copy từ nguồn, cửa sổ từ `watermark_state` | Lấy phần mới |
-| **rerun** (cùng input) | Chạy lại 1 `load_date` đã COMMITTED (sửa code Bronze, kiểm idempotent) | **Không Copy.** Đọc lại đúng `landing_path` của các batch COMMITTED của `load_date` đó | Bronze y hệt; watermark **không đổi** |
+| **normal** | Lịch hằng ngày; sau lỗi chỉ khi không còn batch cần recovery | Copy từ nguồn, cửa sổ từ `watermark_state` | Tạo batch mới; overlap/lookback được giữ trong raw và xử lý ở Silver |
+| **rerun** (cùng input) | Phát lại một batch theo `p_batch_id`, hoặc tất cả batch phù hợp trong `p_load_date`; gồm phục hồi PREPARED/BRONZE_WRITTEN hoặc kiểm tra code với batch COMMITTED | **Không Copy.** Đọc đúng `landing_path` đã đăng ký | Batch cũ được hoàn tất/ghi đè nguyên tử; watermark không lùi |
 | **reprocess** | Nguồn đã sửa dữ liệu cũ; cần lấy lại một khoảng | Copy với `p_window_start` chỉ định (Bước 7) | Có thể khác — đúng, vì input khác |
 
 - S2 ("chạy lại ra cùng kết quả") chỉ áp dụng cho **rerun** (cùng input = landing bất biến + cùng code).
@@ -61,11 +76,11 @@ Hợp đồng nguồn (design/01): file gửi lại = **ghi đè cùng tên**; s
 |---|---|---|
 | File mới | có (LastModified trong cửa sổ) | nạp |
 | Ghi đè cùng tên, nội dung đổi | có (LastModified mới) | hash khác → nạp như **phiên bản mới**; Silver lấy bản `updated_at` mới nhất theo khoá |
-| Ghi đè y hệt / bị chép lại lần nữa do lookback | có | hash trùng file đã COMMITTED → `SKIPPED_DUPLICATE`, không vào Bronze |
+| Ghi đè y hệt / bị chép lại lần nữa do lookback | có | hash trùng file đã COMMITTED trong cùng source/entity → `SKIPPED_DUPLICATE`; recovery cùng `batch_id` được xử lý trước dedup toàn cục |
 | Bản copy khác tên | có | hash trùng → `SKIPPED_DUPLICATE` |
-| File đến với LastModified cũ (vd nguồn giữ thời gian gốc khi upload) | chỉ khi còn trong lookback | ngoài lookback → **không thấy**; ghi rõ là vi phạm hợp đồng; phát hiện bằng DQ freshness / recon số file |
+| File đến với LastModified cũ (vd nguồn giữ thời gian gốc khi upload) | chỉ khi còn trong lookback | ngoài lookback → **không thấy**. Chỉ phát hiện chắc chắn nếu có expected-file inventory/release log; freshness chỉ phát hiện thiếu batch, không chứng minh nguyên nhân. Đây là giới hạn theo hợp đồng nguồn hiện tại |
 
-Hash = `sha2(nội dung file)` tính trong `nb_brz_load` (đọc landing bằng `binaryFile`) — rẻ với file nhỏ, không phụ thuộc metadata nguồn (spike K5).
+Hash = `sha2(nội dung file)` tính trong `nb_brz_load` (đọc landing bằng `binaryFile`). Phạm vi dedup bắt buộc là `(source_system, entity, content_hash)`; cùng bytes ở hai entity khác nhau không được triệt tiêu lẫn nhau. Quyết định hiện phù hợp với file nhỏ; đo trước khi áp dụng cho file lớn.
 
 ## 6. Xoá ở nguồn
 - Watermark không phát hiện hard delete.
@@ -75,7 +90,7 @@ Hash = `sha2(nội dung file)` tính trong `nb_brz_load` (đọc landing bằng 
 ## 7. Pipeline `pl_ingest`
 
 ```
-Parameters  p_load_date, p_mode (normal | rerun | reprocess; mặc định normal), p_window_start (reprocess, Bước 7)
+Parameters  p_load_date, p_mode (normal | rerun | reprocess; mặc định normal), p_batch_id (rerun/recovery), p_window_start (reprocess, Bước 7)
 set_run_start         v_run_start = utcNow('yyyy-MM-dd HH:mm:ss')
 lkp_source_entity     T-SQL: cfg_source_entity ⋈ watermark_state → mỗi entity:
                       load_strategy, source_object, watermark_column, watermark_before, window_start, window_end
@@ -85,7 +100,7 @@ fe_source_entity      items = rerun ? [] : output Lookup
     file    → cp_file_to_landing   Binary, lọc LastModified [window_start, window_end)
     default → fail_unknown_source_type
 nb_brz_load(p_load_date, p_run_id, p_mode, p_plan = output Lookup JSON)
-                      → Bronze + ingestion_batch + watermark_state
+                      → Bronze + ingestion_batch + watermark_state; rerun/recovery nhận p_batch_id
 ```
 Trạng thái lượt chạy, thời lượng, lỗi từng activity: **Monitoring hub** (design/04 §1). Bất kỳ activity nào lỗi → pipeline FAILED trên Fabric; không cần notebook ghi lại.
 
@@ -98,7 +113,7 @@ Landing: `Files/landing/<source>/<entity>/load_date=<d>/batch=<RunId>/` — thư
 | db (table → parquet) | `rowsRead`, `rowsCopied` | so với số dòng Bronze của batch |
 | file (Binary) | `filesRead`, `filesWritten`, `dataRead` — **không có số dòng** | so số file Copy ghi với số file trong `ingestion_batch`; số dòng chỉ biết sau parse (`bronze_row_count`) |
 
-Bước 1: xem các số này trong Monitoring hub khi kiểm thử. Chỉ lưu vào `ingestion_batch` nếu đối soát **tự động** cần (Bước 6, spike K7).
+Bước 1: xem các số này trong Monitoring hub khi kiểm thử. Thiết kế hiện chưa chuyển được metric từng Copy activity vào notebook/`ingestion_batch`; do đó Source↔Bronze chỉ là kiểm thử thủ công ở Bước 1. Nếu muốn recon tự động ở Bước 6 thì K7 là dependency bắt buộc, không phải spike tùy chọn.
 
 ## Quyết định
 - ADR 012: Copy cho mọi nguồn; 3 chiến lược; cửa sổ ERP theo **đồng hồ nguồn** (virtual clock), file theo giờ thật + lookback + hash.
@@ -106,4 +121,4 @@ Bước 1: xem các số này trong Monitoring hub khi kiểm thử. Chỉ lưu 
 ## Còn mở (spike)
 - **K5:** metadata file **nguồn** (size, LastModified) cho `ingestion_batch` — Copy session log / Get Metadata. Không chặn: dedup đã dựa vào hash.
 - **K6:** `%%configure -f` khi notebook chạy từ pipeline.
-- **K7 (Bước 6, nếu cần):** đưa output Copy (`rowsRead`, `filesWritten`) của từng entity vào `ingestion_batch` cho đối soát tự động (Append variable trong ForEach, hoặc đọc Copy log).
+- **K7 (trước recon tự động Bước 6):** chứng minh output Copy (`rowsRead`, `filesWritten`) của từng entity được truyền tới bước recon và lưu bền vững; nếu không đạt, giới hạn Source↔Bronze ở kiểm tra thủ công và không mô tả nó là recon tự động.

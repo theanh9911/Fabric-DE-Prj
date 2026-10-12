@@ -99,10 +99,10 @@ Danh sách chính xác + số lượng sẽ có ở Bước 2 (`dq_findings.md`)
 |---|---|
 | ERP chỉ giữ trạng thái hiện tại | lấy **full snapshot master mỗi ngày**, Bronze giữ mọi snapshot → lịch sử cho SCD2, phát hiện xoá |
 | `updated_at` ERP là **giờ giả lập** | watermark ERP = `max(updated_at)` dữ liệu, không phải giờ chạy ([design/03 §2](../design/03-ingest.md)) |
-| File được ghi vào drop zone theo **giờ thật** | watermark file = LastModified / `run_start` |
+| File được ghi vào drop zone theo **giờ thật UTC** | cửa sổ file dùng LastModified; cận trên là `run_start − settle_minutes`; watermark là cận cửa sổ đã commit |
 | Master dạng file là snapshot đầy đủ | Silver lấy bản mới nhất theo khoá, không cộng dồn |
 | ERP ép kiểu thất bại → NULL | dòng ERP có thể mất thông tin (vd qty) — so với file retail để phát hiện |
-| Có dòng ngày 2027 | cận trên cửa sổ = giờ chạy → không đẩy watermark ([design/03 §2](../design/03-ingest.md)) |
+| Có dòng ngày 2027 | cận trên mô phỏng = `p_load_date + 1 ngày` (giờ nguồn), nên dòng tương lai không vào Bronze và không đẩy watermark ([design/03 §2](../design/03-ingest.md)) |
 
 ## 8. Xem trạng thái Source
 

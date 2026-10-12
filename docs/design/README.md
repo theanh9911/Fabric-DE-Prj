@@ -8,7 +8,7 @@
 | 01 | [source-contract.md](01-source-contract.md) | Mỗi entity nguồn: grain, khoá, cập nhật/xoá, thời gian, tần suất, lỗi đã biết |
 | 02 | [simulator.md](02-simulator.md) | Simulator đang làm gì, cần thêm những tình huống lỗi nào |
 | 03 | [ingest.md](03-ingest.md) | Lấy dữ liệu ERP và file thế nào; cửa sổ nguồn; chạy lại vs xử lý lại |
-| 04 | [control-tables.md](04-control-tables.md) | Bảng `meta`: config, run log, batch, watermark, DQ, recon — cột và luồng ghi |
+| 04 | [control-tables.md](04-control-tables.md) | Bảng `meta`: config, ingestion audit, watermark, DQ, recon — cột và luồng ghi |
 | 05 | [bronze.md](05-bronze.md) | Bronze lưu gì, kiểu dữ liệu, schema drift |
 | 06 | [silver.md](06-silver.md) | Parse → chuẩn hoá → khoá/grain → dedup → hợp nhất; quarantine/flag; history |
 | 07 | [gold-semantic.md](07-gold-semantic.md) | Grain fact, dimension, SCD2, semantic model |

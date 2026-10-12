@@ -16,7 +16,7 @@ Khai báo trong notebook `nb_dq` (danh sách: `rule_id, layer, table, điều ki
 
 | Layer | Rule mẫu | Severity · ngưỡng |
 |---|---|---|
-| Bronze | freshness: entity có batch trong ngày (file retail orders) | warning |
+| Bronze | freshness: retail orders có batch trong ngày; master snapshot chỉ kỳ vọng khi hợp đồng nguồn nói có lịch gửi | warning |
 | Bronze | số dòng batch lệch > 3× trung bình 7 ngày | warning |
 | Silver | khoá not null & unique theo grain | critical · 0 |
 | Silver | tỉ lệ quarantine theo batch | critical nếu > 5% |
@@ -33,8 +33,8 @@ Khai báo trong `nb_ops_recon`; kết quả vào `meta.reconciliation_result` v�
 
 | Phép đối soát | Grain | Tolerance |
 |---|---|---|
-| Source ↔ Bronze — **db**: Copy `rowsRead` vs số dòng Bronze của batch | batch | 0 |
-| Source ↔ Bronze — **file**: Copy `filesWritten` vs số file trong `ingestion_batch` (COMMITTED + SKIPPED_DUPLICATE); mọi file COMMITTED parse được. Số dòng file chỉ có sau parse (`bronze_row_count`) — Binary copy **không** có `rowsRead` | batch | 0 |
+| Source ↔ Bronze — **db**: Copy `rowsRead` vs số dòng Bronze của batch | batch | 0; cần metric per-entity từ pipeline |
+| Source ↔ Bronze — **file**: Copy `filesWritten` vs số file xử lý trong `ingestion_batch` (COMMITTED + SKIPPED_DUPLICATE; loại NO_NEW_DATA); mọi file COMMITTED parse được. Số dòng file chỉ có sau parse (`bronze_row_count`) — Binary copy **không** có `rowsRead` | batch | 0; cần metric per-entity từ pipeline |
 | Freshness: mỗi entity có dòng `ingestion_batch` trong lượt (kể cả `NO_NEW_DATA`); retail orders phải có file mỗi ngày | lượt | — |
 | Bronze → Silver: `vào = ra + quarantine + bỏ do dedup` | batch | 0 |
 | Silver ↔ Gold: số đơn, số dòng, tổng `gross_amount` đã ghi nhận | ngày, tháng | 0 |

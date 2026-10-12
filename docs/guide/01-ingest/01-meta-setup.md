@@ -15,7 +15,7 @@
 
 Trạng thái pipeline/activity, thời lượng, lỗi, Copy output: xem ở **Monitoring hub** — không tự ghi lại ([design/04 §1](../../design/04-control-tables.md)).
 
-**Bỏ** (đã tạo ở Bước 0): `cfg_pipeline_step`, `cfg_dq_rule`, `ref_order_status`, `ref_value_mapping`, `ref_holiday_vn`, `state_watermark`, `state_file_manifest`, `log_pipeline_run`, `log_task_run`, `dq_result_log`, `recon_result`, `schema_registry`. `dq_result`, `reconciliation_result` tạo lại ở Bước 3.
+**Migration v4:** bảng legacy được dọn một lần trong Dev; `cfg_source_entity` được nạp lại từ Git. Không chạy cell DROP lặp lại ở mỗi lần setup hoặc promote Prod. `dq_result`, `reconciliation_result` chỉ tạo ở Bước 3.
 
 **`cfg_source_entity` v4** (9 dòng):
 
@@ -33,14 +33,14 @@ Trạng thái pipeline/activity, thời lượng, lỗi, Copy output: xem ở **
 
 ## Làm
 
-**C — Claude viết vào repo:**
-1. `nb_setup_ddl` v4: cell xoá bảng bỏ (chỉ chạy được khi bảng tồn tại — `DROP TABLE IF EXISTS`), cell tạo 2 bảng `watermark_state`, `ingestion_batch` và sửa cột `cfg_source_entity`.
+**Docs chốt trước khi implementation:**
+1. `nb_setup_ddl` v4: DDL rerunnable cho `watermark_state`, `ingestion_batch`; migration `cfg_source_entity` và bảng legacy phải có guard hoặc được tách thành thao tác one-time, không xóa config mỗi lần chạy.
 2. `nb_setup_config` v4: 1 MERGE cho `cfg_source_entity` như bảng trên; bỏ các cell `ref_*`.
    (`nb_common` không đổi ở bước này; function `std_*` viết ở Bước 2.)
 
-**B — Bạn trên Fabric (ws Dev):**
+**Thao tác Fabric sau khi implementation được duyệt/chốt:**
 1. Đóng mọi tab notebook → Source control → **Update all**.
-2. Xoá dữ liệu thử ở landing: mở `lh_platform` → Files → chuột phải `landing` → **Delete**.
+2. Trên Dev, sao lưu/ghi nhận bảng và landing cần giữ trước migration; chỉ xóa dữ liệu thử đã xác nhận là disposable. Không xóa landing có batch đã commit hoặc batch đang PREPARED/BRONZE_WRITTEN.
 3. Mở `nb_setup_ddl` → **Run all** → Stop session.
 4. Mở `nb_setup_config` → **Run all** → Stop session.
 5. Mở `lh_platform` → đổi sang **SQL analytics endpoint** → **Refresh** (để Lookup thấy bảng mới).
@@ -48,4 +48,4 @@ Trạng thái pipeline/activity, thời lượng, lỗi, Copy output: xem ở **
 ## Kết quả mong đợi
 - `SHOW TABLES IN meta` → đúng **3 bảng**.
 - `SELECT load_strategy, count(*) FROM meta.cfg_source_entity GROUP BY load_strategy` → `file_new_or_changed 5 · db_full_snapshot 3 · db_incremental 1`.
-- `Files/` không còn `landing/`.
+- Landing đã commit hoặc đang recovery vẫn còn nguyên; chỉ dữ liệu thử đã xác nhận disposable mới được dọn.

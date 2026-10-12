@@ -1,6 +1,6 @@
-# 0.3 — `nb_setup_config`: ghi config ✅
+# 0.3 — `nb_setup_config`: ghi config (lịch sử)
 
-> Nội dung config được thay ở [Bước 1.3](../01-ingest/01-meta-setup.md). Cách làm (MERGE từ VALUES) giữ nguyên.
+> Ghi chép v2 để tham khảo. Schema config và cách chạy hiện hành xem [Bước 1.2–1.4](../01-ingest/01-meta-setup.md); không chạy cell cũ từ tài liệu này.
 
 ## Mục tiêu
 Bảng config trong `meta` có nội dung đúng như trong notebook.
@@ -22,7 +22,7 @@ Bảng config trong `meta` có nội dung đúng như trong notebook.
 ## Lịch sử
 | Phiên bản | Nội dung |
 |---|---|
-| v2 (Bước 0) | `cfg_source_entity` 9 dòng (`source_type`, `load_type`…) · `ref_order_status` 4 · `ref_value_mapping` 4 |
+| v2 (Bước 0) | `cfg_source_entity` 9 dòng (`source_type`, `load_type`…) · `ref_order_status` 4 · `ref_value_mapping` 4; lịch sử, không còn là schema đích |
 | v4 (Bước 1.3) | Chỉ `cfg_source_entity` 9 dòng với `load_strategy` (3 chiến lược) |
 
 ## Làm

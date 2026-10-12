@@ -10,7 +10,7 @@
   | load_strategy | window_start | window_end | Đồng hồ |
   |---|---|---|---|
   | db_incremental | watermark − lookback (chưa có → 1900-01-01) | **cuối ngày `p_load_date`** (`p_load_date + 1 ngày`, loại trừ) | nguồn (virtual clock) |
-  | db_full_snapshot | *(không dùng)* | `run_start` (chỉ để ghi log) | — |
+  | db_full_snapshot | *(không dùng)* | `run_start` (snapshot metadata, không phải source watermark) | — |
   | file_new_or_changed | watermark − lookback | `run_start − settle` | giờ thật UTC |
 
 - Lookup chạy T-SQL qua SQL endpoint; thời gian định dạng `yyyy-MM-dd HH:mm:ss` (`CONVERT(…, 120)`).
@@ -23,6 +23,7 @@
 | Tab | Tên | Kiểu | Mặc định | So với bản cũ |
 |---|---|---|---|---|
 | Parameters | `p_load_date` | String | *(trống)* | giữ |
+| Parameters | `p_batch_id` | String | *(trống)* | tùy chọn; chỉ định 1 batch cần replay, để trống thì rerun theo `p_load_date` |
 | Parameters | `p_mode` | String | `normal` | **thêm** |
 | Variables | `v_run_start` | String | | giữ |
 

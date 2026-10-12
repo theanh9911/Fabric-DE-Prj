@@ -15,7 +15,7 @@ pl_maintenance              OPTIMIZE theo lịch; VACUUM có kiểm retention (�
 
 - **Fabric** giữ trạng thái pipeline/activity (Monitoring hub); **notebook** ghi audit dữ liệu (`ingestion_batch`, `dq_result`, `reconciliation_result`) — design/04 §1.
 - `nb_run_layer(layer)`: DAG khai báo **trong notebook** (step → notebook, depends_on) → `notebookutils.notebook.runMultiple` (1 phiên Spark; kết quả từng notebook con hiện trong Monitoring) → gọi `nb_dq(layer)`.
-- Mọi lệnh ghi bảng đặt `spark.databricks.delta.commitInfo.userMetadata = <run_id>` → `DESCRIBE HISTORY` cho biết version nào do run nào ghi.
+- Mọi lệnh ghi bảng đặt `spark.databricks.delta.commitInfo.userMetadata` chứa `run_id`, `batch_id` và operation → `DESCRIBE HISTORY` truy ra đúng commit; xác minh khả năng ghi metadata ở Fabric Runtime (K8).
 - Retry: activity Notebook retry 1 lần (Fabric ghi lại từng lần thử).
 
 ## 2. Gọi notebook
@@ -26,14 +26,14 @@ pl_maintenance              OPTIMIZE theo lịch; VACUUM có kiểm retention (�
 | Pipeline Notebook activity + parameter cell | Bước lớn (ingest, layer) |
 | `runMultiple` | Nhiều notebook trong 1 layer, chung session |
 
-Cần kiểm (K6): `%%configure -f` khi notebook chạy từ pipeline và trong `runMultiple`.
+Cần kiểm: K6 (`%%configure -f` khi notebook chạy từ pipeline và trong `runMultiple`); K8 (ghi `userMetadata` đủ run/batch/operation và tra được trong `DESCRIBE HISTORY`).
 
 ## 3. Khôi phục
 
 | Sự cố | Cách |
 |---|---|
-| Lượt chạy lỗi giữa chừng | Chạy lại cùng `p_load_date` (`p_mode = rerun`) |
-| Bảng Gold/Silver hỏng | `DESCRIBE HISTORY <bảng>` → tìm version theo `userMetadata = run_id` của lượt tốt gần nhất → `RESTORE TABLE … VERSION AS OF <v>` — **chỉ khi version còn trong retention** |
+| Lượt chạy lỗi giữa chừng | Tra `ingestion_batch` còn PREPARED/BRONZE_WRITTEN; replay đúng landing bằng `p_mode = rerun`, `p_batch_id` |
+| Bảng Gold/Silver hỏng | `DESCRIBE HISTORY <bảng>` → lọc `userMetadata` theo run/batch/operation và xác minh version tốt trước sự cố → `RESTORE TABLE … VERSION AS OF <v>` — **chỉ khi version còn trong retention** |
 | Hỏng sâu / sửa logic | `p_full_reload`: dựng lại Silver/Gold từ Bronze |
 | Bronze hỏng | Dựng lại từ landing |
 | Debug thiếu dữ liệu (Q15) | report → refresh → Gold history → Silver → quarantine → Bronze → `ingestion_batch` (cửa sổ) → landing → Source |

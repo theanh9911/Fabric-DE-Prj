@@ -29,14 +29,14 @@
 |---|---|---|
 | **Metadata-driven** | Pipeline đọc danh sách nguồn từ bảng rồi lặp, không viết cứng | Lookup `cfg_source_entity` → ForEach |
 | **Load strategy** | Cách lấy của 1 entity | `db_incremental` · `db_full_snapshot` · `file_new_or_changed` |
-| **Source window** | Khoảng nguồn được đọc trong 1 lượt: `(window_start, window_end]` | ghi vào `ingestion_batch` |
+| **Source window** | Cửa sổ theo chiến lược: DB incremental `window_start < updated_at < window_end`; file `window_start ≤ LastModified < window_end` | ghi vào `ingestion_batch`; cận trên loại trừ |
 | **Watermark** | Mốc "đã lấy tới đây" hiện hành | `watermark_state`; ERP = `max(updated_at)` đã lấy; file = `window_end` |
 | **Lookback** | Lùi mốc để bắt dòng commit trễ | ERP orders: 1440 phút |
 | **Settle** | Bỏ qua file vừa sửa sát giờ chạy (có thể đang ghi dở) | file: 5 phút |
-| **`run_start`** | Giờ thật lúc bắt đầu lượt chạy; mốc trên chung | biến `v_run_start` |
+| **`run_start`** | Giờ thật UTC lúc bắt đầu lượt chạy; dùng làm cơ sở cận trên file sau settle, không dùng làm cận trên ERP mô phỏng | biến `v_run_start` |
 | **Landing** | Bản sao **nguyên trạng** vừa kéo về; bất biến | `Files/landing/<source>/<entity>/load_date=…/batch=…/` |
 | **normal / rerun / reprocess** | Lấy phần mới · đọc lại landing cũ (cùng input) · lấy lại 1 khoảng nguồn chỉ định | tham số `p_mode` |
-| **Idempotent** | Chạy lại cùng input → cùng kết quả | rerun: xoá rồi ghi lại đúng `batch_id` |
+| **Idempotent** | Chạy lại cùng input → cùng kết quả | rerun phát lại landing đã commit với cùng `batch_id`; cách ghi phải nguyên tử/idempotent |
 
 ## Ba định danh
 
@@ -52,13 +52,13 @@
 | Đồng hồ | Gồm | Dùng cho |
 |---|---|---|
 | **Đồng hồ nguồn** (virtual clock) | `updated_at`, `order_date` trong dữ liệu; `p_load_date` | Cửa sổ & watermark ERP, ngày nghiệp vụ |
-| **Giờ thật UTC** | LastModified của file; `run_start`; `*_at_utc` trong log | Cửa sổ & watermark file, log vận hành |
+| **Giờ thật UTC** | LastModified của file; `run_start`; `*_at_utc` trong audit | Cửa sổ & watermark file, dấu thời gian audit |
 
 ## Layer
 
 | Từ | Nghĩa |
 |---|---|
-| **Bronze (`brz`)** | Bằng chứng nguồn dạng bảng: ERP giữ kiểu, CSV là chữ; + cột kỹ thuật; append-only |
+| **Bronze (`brz`)** | Bằng chứng nguồn dạng bảng: ERP giữ kiểu, CSV là chữ; + cột kỹ thuật; append theo batch, atomic replace chỉ khi replay đúng batch |
 | **Silver (`slv`)** | Parse → chuẩn hoá → grain → dedup → hợp nhất nguồn; có quarantine |
 | **Gold (`gld`)** | Star schema: dimension + fact + aggregate |
 | **Schema drift** | Nguồn thêm/bớt/đổi kiểu cột; Bronze ghi nhận, downstream mở rộng có chủ đích |

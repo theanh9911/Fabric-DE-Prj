@@ -72,9 +72,11 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 | D14 | `batch_id` vừa là khoá dòng log vừa là định danh dữ liệu | `ingestion_batch_id` = 1 lần thử (khoá); `batch_id` + `landing_path` = dữ liệu được replay (ổn định khi rerun) | design/04 §2 |
 | D15 | Cửa sổ ERP so `updated_at` (giờ giả lập) với `run_start` (giờ thật) | **Mỗi cửa sổ chỉ dùng một đồng hồ:** ERP cận trên = cuối ngày `p_load_date` (đồng hồ nguồn); file theo giờ thật. Múi giờ chỉ ảnh hưởng Silver | design/01 §4, 03 §2 |
 | D16 | Recon Source↔Bronze bằng `rowsRead` cho mọi nguồn | db: `rowsRead`; file Binary: **số file** (không có `rowsRead`); số dòng file chỉ sau parse | design/03 §8, 08 §3 |
-| D18 | Tự ghi `pipeline_run`, `task_run` (nhân bản log Fabric) | **Log vận hành ở Monitoring hub**; `meta` chỉ audit dữ liệu; RESTORE theo Delta history + `userMetadata = run_id`; bỏ `nb_ops_run_end` | design/04 §1 |
+| D18 | Tự ghi `pipeline_run`, `task_run` (nhân bản log Fabric) | **Log vận hành ở Monitoring hub**; `meta` chỉ audit dữ liệu; Delta history gắn run/batch/operation để RESTORE (xác minh K8); bỏ `nb_ops_run_end` | design/04 §1 |
 | D19 | Watermark mới = giá trị của batch | **Không bao giờ lùi:** `max(watermark hiện tại, giá trị batch)` — lookback có thể cho batch toàn dòng cũ | design/03 §3 |
 | D17 | File gửi lại có thể lọt khỏi cửa sổ | Hợp đồng: gửi lại = ghi đè (LastModified mới). Ingest file lookback 1 ngày + dedup **hash nội dung**; LastModified cũ hơn lookback = vi phạm hợp đồng | design/01, 03 §5 |
+| D20 | Watermark đợi cả lượt và Bronze `DELETE` rồi append | Audit state `PREPARED → BRONZE_WRITTEN → COMMITTED`; commit từng entity, ghi Bronze nguyên tử rồi tiến watermark. Recovery dựa vào stage và cùng `batch_id` | design/03 §3–4, 04 §5, 05 §3 |
+| D21 | `batch_id` được sinh theo RunId nhưng mô tả là ổn định khi retry | Rerun/recovery nhận `p_batch_id`, reuse landing bất biến; lượt normal mới/reprocess tạo batch mới. Lookback có thể overlap Bronze và Silver dedup | design/03 §4, 04 §3 |
 
 ---
 
@@ -86,10 +88,10 @@ Và trả lời đề Part I (Q1–Q17) bằng bằng chứng chạy thật (§6
 | P2 | **Source chỉ đọc**; simulator không biết Platform; Platform không ghi ngược |
 | P3 | **Generic ở điều phối & logging; chiến lược ingest theo loại nguồn** |
 | P4 | **Logic ở code, config ở bảng khi runtime/pipeline cần đọc** — mỗi logic một chỗ |
-| P5 | **Raw bất biến theo khả năng nguồn** (landing + Bronze, append-only) → luôn replay được |
+| P5 | **Raw bất biến theo khả năng nguồn**: landing bất biến; Bronze append theo batch, chỉ atomic replace cùng batch khi replay/recovery → replay được |
 | P6 | **Incremental mặc định, full reload luôn có**; watermark chỉ tiến khi batch COMMITTED |
 | P7 | **Rerun idempotent**; reprocess có chủ đích và được ghi nhận |
-| P8 | **Không mất, không im lặng** — quarantine có lý do; log FAILED nhưng pipeline vẫn báo lỗi |
+| P8 | **Không mất, không im lặng** — quarantine có lý do; lỗi vận hành làm pipeline FAILED; batch audit giữ stage để recovery |
 | P9 | **Đối soát count + amount** mọi bước, có ngưỡng |
 | P10 | **Truy vết:** `run_id`, `batch_id`, `load_date` xuyên layer |
 | P11 | **Không hardcode môi trường** — lakehouse theo tên; giá trị theo môi trường ở Variable Library |
@@ -115,7 +117,7 @@ CompanyA-DataPlatform-<Dev|Test|Prod>  (vòng đời triển khai)
     brz.*                Bronze: bằng chứng nguồn + metadata
     slv.*, quarantine_*  Silver: parse, chuẩn hoá, grain, dedup, hợp nhất, history
     gld.*                Gold: dimensions, facts, aggregates
-    meta.*               config, watermark, batch, run/task log, DQ, recon
+    meta.*               config, watermark, ingestion audit, DQ, recon
   pl_master_daily: ingest → silver → gold → recon → refresh → log/cảnh báo
   sm_sales (Direct Lake) → rpt_sales · rpt_pipeline_health
 GitHub: notebook, pipeline, SQL, docs, config không bí mật
@@ -133,13 +135,13 @@ GitHub: notebook, pipeline, SQL, docs, config không bí mật
 | # | Việc | Ai | Xong khi |
 |---|---|---|---|
 | 1.1 | Khung `pl_ingest` + nhánh db | B | ✅ |
-| 1.2 | `nb_setup_ddl` v4: tạo `watermark_state`, `ingestion_batch`; cột `load_strategy`… cho `cfg_source_entity`; xoá bảng bỏ | C | notebook trong repo |
-| 1.3 | `nb_setup_config` v4: 9 dòng với 3 chiến lược; bỏ `ref_*` | C | |
-| 1.4 | Dọn Dev (xoá bảng bỏ, xoá landing thử) → chạy 1.2, 1.3 | B | `meta` đúng 3 bảng |
+| 1.2 | `nb_setup_ddl` v4: tạo/migrate 3 bảng; migration legacy có kiểm soát và rerunnable, không xóa config mỗi lần chạy | C | notebook trong repo |
+| 1.3 | `nb_setup_config` v4: 9 dòng với 3 chiến lược; bỏ `ref_*`; giá trị EDA-pending phải để rõ NULL/TBD, không gán giả định | C | |
+| 1.4 | Backup/kiểm tra Dev; one-time migrate bảng bỏ và schema config; chỉ dọn landing thử đã xác nhận không được tham chiếu → chạy 1.2, 1.3 | B | `meta` đúng 3 bảng; landing batch còn hiệu lực giữ nguyên |
 | 1.5 | Pipeline: Lookup "ingest plan" mới · Switch theo `load_strategy` · nhánh file · biểu thức Copy theo cửa sổ | B (C đưa biểu thức) | Preview Lookup đúng cửa sổ |
-| 1.6 | `nb_brz_load` (Bronze + `ingestion_batch` + `watermark_state`, ghi bảng kèm `userMetadata = run_id`) | C | |
-| 1.7 | Nối notebook vào pipeline; spike K5 (metadata file nguồn), K6 (`%%configure` qua pipeline) | B+C | |
-| 1.8 | Kiểm: normal → rerun (không đổi) → sim +1 ngày → normal (chỉ tăng phần mới) | B+C | 4 ca xanh |
+| 1.6 | Chốt protocol retry/commit; `nb_brz_load` ghi audit PREPARED → BRONZE_WRITTEN → COMMITTED, Bronze atomic theo batch, watermark từng entity; `p_batch_id` recovery; RESTORE metadata phân biệt batch/operation | C | |
+| 1.7 | Nối notebook vào pipeline; spike K5 (metadata file nguồn), K6 (`%%configure` qua pipeline), K8 (Delta `userMetadata`) | B+C | |
+| 1.8 | Kiểm: normal → rerun → ngày mới → normal retry/no-change → lỗi giữa các entity → khôi phục | B+C | T1–T5 đạt; không mất/nhân đôi batch sau failure |
 
 ### Bước 2 — Source contract + EDA (Q1)
 `nb_ops_eda` trên Bronze → chốt các mục "Còn mở" của design/01 → `docs/dq_findings.md` (Q1) → `nb_common`: `norm_key`, `std_*`, `is_sales_recognized`, `status_sequence`.
@@ -193,7 +195,8 @@ Scenario `bad_rows`, `missing_file`, `file_resend`, `duplicate_file`, `partial_f
 | SQL endpoint đồng bộ trễ → Lookup đọc watermark cũ khi chạy liên tiếp | Rerun/idempotent nên chỉ lấy dư; nếu đo thấy vấn đề → control tables sang Fabric SQL Database (design/04) |
 | `%%configure` lỗi trong high-concurrency session | Tắt HC cho notebook; spike K6 |
 | Không lấy được metadata file nguồn | Spike K5 (Copy session log / Get Metadata); dedup không phụ thuộc vì dùng hash nội dung |
-| Lấy output Copy từng entity trong ForEach cho recon | Spike K7 (Append variable / Copy log) |
+| Lấy output Copy từng entity trong ForEach cho recon | K7 là điều kiện trước khi tuyên bố Source↔Bronze recon tự động; nếu không làm được, bước này giữ dạng kiểm tra thủ công |
+| Delta commit metadata có dùng được trên Fabric Runtime | K8: thử `userMetadata` với run/batch/operation và xác nhận `DESCRIBE HISTORY`; nếu không hỗ trợ, RESTORE dựa vào version/time và audit batch, không khẳng định tra trực tiếp bằng RunId |
 | Pipeline không tự lưu | Ctrl+S mỗi activity; Commit sớm |
 | Runtime 2.0 bật ANSI | `try_cast`, `try_to_timestamp` |
 
