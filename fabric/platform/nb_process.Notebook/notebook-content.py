@@ -29,8 +29,15 @@ p_drop_lakehouse = "lh_retail_drop"
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 import json
 from pyspark.sql import functions as F

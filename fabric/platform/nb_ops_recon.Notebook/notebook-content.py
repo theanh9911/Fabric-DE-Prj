@@ -21,7 +21,10 @@ p_batch_id = ""
 
 # CELL ********************
 
+
 %run nb_common
+
+# CELL ********************
 
 import json
 

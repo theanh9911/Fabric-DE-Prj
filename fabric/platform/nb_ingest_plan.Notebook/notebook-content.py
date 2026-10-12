@@ -25,8 +25,15 @@ p_from_layer = "ingest"
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 from datetime import date, datetime, timedelta, timezone
 import json

@@ -24,8 +24,15 @@ p_full_reload = False
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window

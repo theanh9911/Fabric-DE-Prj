@@ -23,7 +23,10 @@ p_drop_lakehouse = "lh_retail_drop"
 
 # CELL ********************
 
+
 %run nb_common
+
+# CELL ********************
 
 import json
 from datetime import datetime, timezone

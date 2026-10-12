@@ -20,7 +20,10 @@ p_optimize = True
 
 # CELL ********************
 
+
 %run nb_common
+
+# CELL ********************
 
 tables = []
 for schema_name in ["slv", "gld"]:

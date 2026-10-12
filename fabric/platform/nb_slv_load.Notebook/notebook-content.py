@@ -25,8 +25,15 @@ p_full_reload = False
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 import json
 from pyspark.sql import functions as F

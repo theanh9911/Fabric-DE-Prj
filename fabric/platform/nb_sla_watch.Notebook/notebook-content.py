@@ -20,8 +20,15 @@ p_load_date = ""
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 from datetime import datetime, timedelta, timezone
 import json

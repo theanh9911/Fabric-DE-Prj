@@ -22,8 +22,15 @@ p_layer = "all"
 
 # CELL ********************
 
+
 %run nb_config
+
+# CELL ********************
+
+
 %run nb_common
+
+# CELL ********************
 
 import json
 
