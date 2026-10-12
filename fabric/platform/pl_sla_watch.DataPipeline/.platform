@@ -1,5 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
-  "metadata": {"type": "DataPipeline", "displayName": "pl_sla_watch"},
-  "config": {"version": "2.0", "logicalId": "1c9c6c57-45c3-4411-a286-9e995a083013"}
+  "metadata": {
+    "type": "DataPipeline",
+    "displayName": "pl_sla_watch"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "1c9c6c57-45c3-4411-a286-9e995a083013"
+  }
 }

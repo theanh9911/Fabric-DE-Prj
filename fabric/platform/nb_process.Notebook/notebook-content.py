@@ -3,7 +3,9 @@
 # METADATA ********************
 
 # META {
-# META   "kernel_info": {"name": "synapse_pyspark"},
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   },
 # META   "dependencies": {}
 # META }
 
@@ -32,10 +34,24 @@ p_drop_lakehouse = "lh_retail_drop"
 
 %run nb_config
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # CELL ********************
 
 
 %run nb_common
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # CELL ********************
 
@@ -238,3 +254,10 @@ log_table_run(run_id, "pipeline", "pipeline.run_process", "SUCCEEDED",
 notebookutils.notebook.exit(json.dumps({"run_id": run_id, "silver": loaded,
                                         "gold": gold_result, "dq": dq_result,
                                         "recon": recon_result, "gold_changed": gold_changed}))
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }

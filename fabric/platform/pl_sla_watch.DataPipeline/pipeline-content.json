@@ -1,16 +1,35 @@
 {
   "properties": {
-    "parameters": {"p_load_date": {"type": "String", "defaultValue": ""}},
-    "activities": [{
-      "name": "check_source_sla", "type": "TridentNotebook", "dependsOn": [],
-      "policy": {"timeout": "0.00:20:00", "retry": 1, "retryIntervalInSeconds": 60},
-      "typeProperties": {
-        "notebookId": "0f5732c6-3b60-4f34-b4b5-530f8a2b5011",
-        "workspaceId": "00000000-0000-0000-0000-000000000000",
-        "parameters": {
-          "p_load_date": {"value": {"value": "@pipeline().parameters.p_load_date", "type": "Expression"}, "type": "string"}
-        }
+    "activities": [
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "0f5732c6-3b60-4f34-b4b5-530f8a2b5011",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_load_date": {
+              "value": {
+                "value": "@pipeline().parameters.p_load_date",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        },
+        "policy": {
+          "timeout": "0.00:20:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60
+        },
+        "name": "check_source_sla",
+        "dependsOn": []
       }
-    }]
+    ],
+    "parameters": {
+      "p_load_date": {
+        "type": "String",
+        "defaultValue": ""
+      }
+    }
   }
 }

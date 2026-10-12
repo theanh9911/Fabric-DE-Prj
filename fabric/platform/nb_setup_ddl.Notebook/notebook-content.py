@@ -3,8 +3,21 @@
 # METADATA ********************
 
 # META {
-# META   "kernel_info": {"name": "synapse_pyspark"},
-# META   "dependencies": {}
+# META   "kernel_info": {
+# META     "name": "synapse_pyspark"
+# META   },
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "79063a99-fe42-4078-8659-25c7c2894c06",
+# META       "default_lakehouse_name": "lh_platform",
+# META       "default_lakehouse_workspace_id": "02594272-f3b4-47d6-a983-347bdaefe9be",
+# META       "known_lakehouses": [
+# META         {
+# META           "id": "79063a99-fe42-4078-8659-25c7c2894c06"
+# META         }
+# META       ]
+# META     }
+# META   }
 # META }
 
 # PARAMETERS CELL ********************
@@ -41,6 +54,13 @@ if p_clean_schema:
                 spark.sql(f"DROP VIEW IF EXISTS {object_name}")
             else:
                 spark.sql(f"DROP TABLE IF EXISTS {object_name}")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # CELL ********************
 
@@ -143,3 +163,10 @@ if p_clean_schema:
 
 # MAGIC %%sql
 # MAGIC SHOW TABLES IN meta;
+
+# METADATA ********************
+
+# META {
+# META   "language": "sparksql",
+# META   "language_group": "synapse_pyspark"
+# META }
