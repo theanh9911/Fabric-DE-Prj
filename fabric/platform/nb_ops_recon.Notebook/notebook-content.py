@@ -31,6 +31,16 @@ import json
 run_id = p_run_id or str(uuid.uuid4())
 checks = []
 
+missing = [table for table in ["gld.gld_f_sales_line", "gld.gld_a_sales_month"]
+           if not table_exists(table)]
+for table in missing:
+    check_id = f"required_table.{table}"
+    log_check(run_id, p_batch_id, check_id, "recon", table, "table_exists",
+              1, 0, 0, "critical", fail_fast=False)
+    checks.append((check_id, "FAIL"))
+if missing:
+    raise RuntimeError(f"Cannot reconcile; required Gold tables are missing: {', '.join(missing)}")
+
 if table_exists("gld.gld_f_sales_line") and table_exists("gld.gld_a_sales_month"):
     fact = spark.table("gld.gld_f_sales_line").withColumn("month_key", F.floor(F.col("date_key") / 100).cast("int"))
     expected = fact.groupBy("month_key").agg(F.sum("gross_amount").alias("gross"), F.count(F.lit(1)).alias("n"))

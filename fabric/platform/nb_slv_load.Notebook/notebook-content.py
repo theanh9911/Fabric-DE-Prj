@@ -65,6 +65,8 @@ for manifest in pending:
         if len(df.columns) == 0:
             append_ingestion_record(manifest, run_id, "LOADED", {"rows_read": 0, "rows_changed": 0,
                                                                    "rows_unchanged": 0, "rows_quarantined": 0})
+            log_table_run(run_id, "slv", target, "SUCCEEDED", batch_from, batch_to, p_mode,
+                          {"rows_in": 0, "rows_inserted": 0, "rows_quarantined": 0})
             continue
         business_cols = [c for c in df.columns if not c.startswith("_")]
         required_keys = spec.get("business_keys", [])

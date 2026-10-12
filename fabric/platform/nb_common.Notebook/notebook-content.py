@@ -121,7 +121,8 @@ def log_table_run(run_id, layer, table_name, event, batch_from=None, batch_to=No
     (spark.createDataFrame(row, schema).write.format("delta").mode("append").saveAsTable("meta.table_run"))
 
 def log_check(run_id, batch_id, check_id, check_type, table_name, grain_value,
-              expected, actual, threshold=0, severity="critical", sample_keys=None):
+              expected, actual, threshold=0, severity="critical", sample_keys=None,
+              fail_fast=True):
     passed = actual is not None and expected is not None and abs(float(actual)-float(expected)) <= float(threshold)
     status = "PASS" if passed else ("WARN" if severity == "warning" else "FAIL")
     schema = ("run_id string, batch_id string, check_id string, check_type string, table_name string, "
@@ -134,7 +135,7 @@ def log_check(run_id, batch_id, check_id, check_type, table_name, grain_value,
             decimal_value(expected), decimal_value(actual), decimal_value(threshold),
             severity, status, sample_keys, utc_now())]
     spark.createDataFrame(row, schema).write.format("delta").mode("append").saveAsTable("meta.check_result")
-    if status == "FAIL" and severity == "critical":
+    if status == "FAIL" and severity == "critical" and fail_fast:
         raise ValueError(f"Critical check failed: {check_id}, expected={expected}, actual={actual}")
     return status
 

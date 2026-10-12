@@ -12,6 +12,7 @@
 p_load_date = ""
 p_window_start = ""
 p_window_end = ""
+p_run_id = ""
 p_entities = "ALL"
 p_mode = "normal"
 p_from_layer = "ingest"
@@ -41,7 +42,7 @@ import json
 if not p_load_date:
     p_load_date = ((datetime.now(timezone.utc) + timedelta(hours=7)).date() - timedelta(days=1)).isoformat()
 batch_id = p_load_date.replace("-", "")
-run_id = str(uuid.uuid4())
+run_id = p_run_id or str(uuid.uuid4())
 wm = {}
 if table_exists("meta.v_watermark"):
     for row in spark.table("meta.v_watermark").collect():

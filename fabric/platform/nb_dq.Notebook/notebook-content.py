@@ -38,6 +38,19 @@ run_id = p_run_id or str(uuid.uuid4())
 failures = []
 results = []
 
+def require_tables(tables):
+    missing = []
+    for table in tables:
+        if table_exists(table):
+            continue
+        check_id = f"required_table.{table}"
+        log_check(run_id, p_batch_id, check_id, "dq", table, "table_exists",
+                  1, 0, 0, "critical", fail_fast=False)
+        results.append((check_id, "FAIL"))
+        missing.append(table)
+    if missing:
+        raise RuntimeError(f"Required Gold tables are missing: {', '.join(missing)}")
+
 def check_unique(table, keys, check_id):
     if not table_exists(table):
         return
@@ -69,6 +82,9 @@ if p_layer in ("all", "slv"):
                      "slv_orders_event.event_key_unique")
 
 if p_layer in ("all", "gld"):
+    require_tables([
+        "gld.gld_d_date", "gld.gld_d_customer", "gld.gld_d_product",
+        "gld.gld_d_salesman", "gld.gld_f_sales_line", "gld.gld_a_sales_month"])
     for table, keys, required in [
         ("gld.gld_d_date", ["date_key"], ["date_key", "date_value"]),
         ("gld.gld_d_customer", ["customer_sk"], ["customer_sk"]),

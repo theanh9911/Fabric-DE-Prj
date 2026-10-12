@@ -145,22 +145,31 @@ plan_doc = json.loads(p_plan_json)
 run_id = plan_doc["run_id"]
 batch_id = plan_doc["batch_id"]
 delivery_records = []
+source_results = []
 for item in plan_doc["sources"]:
     spec = item
     if spec["load_strategy"] not in ("db_incremental", "db_full_snapshot", "file_new_or_changed"):
+        source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                               "outcome": "SKIPPED", "reason": "unsupported load strategy"})
         continue
     if spec["load_strategy"].startswith("db_"):
         df = sql_source_frame(spec, item)
         files = []
         row_count = df.count()
         if row_count == 0:
+            source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                                   "outcome": "NO_DATA", "rows_read": 0})
             continue
     else:
         df, files = file_source_frame(spec, item)
         if df is None:
+            source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                                   "outcome": "NO_DATA", "rows_read": 0})
             continue
         row_count = df.count()
         if row_count == 0:
+            source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                                   "outcome": "NO_DATA", "rows_read": 0})
             continue
     checksum_cols = sorted([c for c in df.columns if not c.startswith("_")])
     row_hash = F.xxhash64(*[F.col(c).cast("string") for c in checksum_cols])
@@ -170,6 +179,9 @@ for item in plan_doc["sources"]:
     if (spec["load_strategy"] in ("db_full_snapshot", "file_new_or_changed") and
             spec["kind"] == "snapshot" and item.get("last_checksum") == source_checksum and
             not item.get("force_copy", False)):
+        source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                               "outcome": "UNCHANGED", "rows_read": row_count,
+                               "source_checksum": source_checksum})
         continue
     delivery_id = str(uuid.uuid4())
     target = (f"Files/landing/{batch_id}/{spec['source_system']}/{spec['entity']}/"
@@ -199,6 +211,10 @@ for item in plan_doc["sources"]:
     notebookutils.fs.put(f"{target}/_manifest.json", payload, True)
     manifest["landing_path"] = target
     delivery_records.append(manifest)
+    source_results.append({"source_system": spec["source_system"], "entity": spec["entity"],
+                           "outcome": "DELIVERED", "rows_read": row_count,
+                           "delivery_id": delivery_id, "landing_path": target})
 
 notebookutils.notebook.exit(json.dumps({"run_id": run_id, "batch_id": batch_id,
-                                        "deliveries": delivery_records}, default=str))
+                                        "deliveries": delivery_records,
+                                        "source_results": source_results}, default=str))

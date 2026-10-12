@@ -723,7 +723,7 @@ CREATE TABLE IF NOT EXISTS meta.ingestion_batch (            -- 1 dòng = 1 deli
 
 CREATE TABLE IF NOT EXISTS meta.table_run (                   -- 1 dòng = 1 sự kiện · append
   run_id STRING, batch_from STRING, batch_to STRING, run_mode STRING, layer STRING, table_name STRING,
-  event STRING COMMENT 'STARTED | SUCCEEDED | FAILED',
+  event STRING COMMENT 'STARTED | SUCCEEDED | FAILED | NO_DATA | UNCHANGED | SKIPPED | INCOMPLETE',
   rows_in BIGINT, rows_inserted BIGINT, rows_updated BIGINT, rows_deleted BIGINT, rows_quarantined BIGINT,
   delta_version BIGINT,
   source_versions MAP<STRING, BIGINT> COMMENT 'version các bảng nguồn đã xử lý tới (§3.7 mức 4)',
@@ -743,6 +743,10 @@ SELECT source_system, entity,
 FROM meta.ingestion_batch WHERE status = 'LOADED'
 GROUP BY source_system, entity;
 ```
+- Mọi chặng điều phối (`ingest_plan`, `ingest`, `silver`, `gold_dimensions`, `gold fact`, `dq`, `reconciliation`, `run_process`) đều append `STARTED` và kết quả cuối vào `table_run`; child notebook lỗi phải ghi `FAILED` kèm traceback trước khi ném lỗi lên pipeline.
+- Từng entity ingest ghi `STARTED`, sau đó `SUCCEEDED`, `NO_DATA`, `UNCHANGED`, `SKIPPED` hoặc `INCOMPLETE`, có row metrics. `NO_DATA`/`UNCHANGED` là kết quả được ghi rõ, không phải delivery bị mất dấu; `INCOMPLETE` yêu cầu kiểm tra manifest khi child dừng trước khi trả per-source outcomes.
+- `nb_process` kiểm tra kết quả child notebook. Thiếu Silver orders hoặc thiếu bảng Gold bắt buộc là `FAILED`; không được coi child notebook exit bình thường với lý do thiếu input là Gold thành công.
+- DQ/reconciliation ghi check `required_table.*` và fail rõ nếu thiếu bảng fact/aggregate/dimension bắt buộc; không bỏ qua bảng thiếu rồi trả kết quả rỗng.
 - Delivery dở dang = có manifest mà không có dòng LOADED. Không cần trạng thái trung gian.
 - Watermark tiến **cùng dòng** với LOADED, nên không bao giờ lệch.
 - `table_run`: STARTED mà không có kết thúc nghĩa là session chết.

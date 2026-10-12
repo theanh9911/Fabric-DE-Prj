@@ -19,6 +19,12 @@ truth, [`ARCHITECTURE.md`](ARCHITECTURE.md).
 No Bronze schema, `cfg_*` tables, or `state_*` tables are created. `meta` has
 `ingestion_batch`, `table_run`, and `check_result` plus `meta.v_watermark`.
 
+`table_run` is the append-only trace for orchestration as well as table work:
+the process, planner, ingest, Silver, Gold dimensions/fact, DQ, and reconciliation
+each record start and outcome. `NO_DATA`, `UNCHANGED`, `SKIPPED`, and `INCOMPLETE`
+are explicit events. Ingest records each configured entity outcome; missing Silver orders or
+required Gold tables fail visibly instead of producing a false Gold success.
+
 ## Deploy sequence
 
 ### New Dev workspace checklist
