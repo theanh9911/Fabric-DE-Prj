@@ -21,13 +21,22 @@ No Bronze schema, `cfg_*` tables, or `state_*` tables are created. `meta` has
 
 ## Deploy sequence
 
-1. Connect the Fabric Dev workspace to this folder/branch and sync the items.
-2. In each notebook that accesses platform tables, use **Data items → Add data items** to attach `lh_platform`, then set it as the default Lakehouse. Enable **Lakehouse Auto-Binding in Git** in notebook Git settings and commit the generated binding metadata.
-3. Confirm the source workspace and lakehouse names in `pl_master_daily` parameters.
-4. Grant the executing identity read access to the source SQL Database and drop-zone Lakehouse, and write access to the platform Lakehouse.
-5. Run `nb_setup_ddl`, then run `nb_config` to validate configuration.
-6. Run `pl_master_daily` with a simulator date and a single small entity first; then run all sources and replay the same date with `p_mode=rerun`.
-7. Inspect Landing manifests, `meta.ingestion_batch`, Silver/Gold counts, quarantine, `meta.check_result`, and pipeline monitoring before scheduling.
+### New Dev workspace checklist
+
+1. Create a new Fabric workspace, for example `CompanyA-DataPlatform-Dev2`, on the intended Fabric capacity. Give the operator Contributor access and identify which workspace identity will run pipelines/notebooks.
+2. Connect that workspace to the repository and the `dev` branch using Fabric **Workspace settings → Git integration**. Sync/update all items from `fabric/platform/`; resolve any Git binding prompt for pipeline notebook references in the new workspace. Do not copy workspace or item IDs from the old workspace.
+3. Confirm the source workspace still exists and is accessible. By default, pipeline parameters expect source workspace `CompanyA-Source`, SQL Database `sqldb_erp_wholesale`, and drop-zone Lakehouse `lh_retail_drop`. If the source items have different names, set those three parameters on `pl_master_daily` and `pl_backfill` before a run.
+4. Grant the executing identity read access to the source workspace, SQL Database, and drop-zone Lakehouse, plus write access to the new platform workspace and `lh_platform`. Confirm SQL token-based access and OneLake reads are permitted by tenant/workspace policy.
+5. Open each notebook that reads or writes platform tables. In **Data items → Add data items**, add the new workspace's `lh_platform` and set it as the default Lakehouse. Enable **Lakehouse Auto-Binding in Git** in the notebook Git settings; save and commit the generated binding metadata to `dev`, then sync it back to the workspace. Do not hand-author the generated binding IDs.
+6. Run `nb_setup_ddl` once with `p_clean_schema=False`. It creates `slv`, `gld`, `meta` and the three metadata tables. For a brand-new workspace there is nothing to clean. If retrying bootstrap after objects were created, leave clean off; the notebook is idempotent. Only use `p_clean_schema=True` for an intentional Dev reset: it drops objects under `slv`, `gld`, `meta` and preserves `Files/landing`.
+7. Run `nb_config` and confirm configuration validation succeeds. Then run a low-cost smoke test before the full load: use `pl_master_daily`, set a simulator `p_load_date`, and select one small source entity (`p_entities`, e.g. `wholesale.customers`) if that entity is populated for that date. Keep `p_mode=normal`, `p_from_layer=ingest`, and `p_full_reload=false`.
+8. Check the pipeline and Spark Monitoring hub, then inspect the Landing manifest, `meta.ingestion_batch`, target Silver/Gold rows, `slv.v_quarantine_open`, `meta.check_result`, and `meta.table_run`. Replay the same date with `p_mode=rerun` and verify no unexpected duplicate/change; resolve any failure before proceeding.
+9. Run one full date with `p_entities=ALL`; inspect counts, DQ and reconciliation. Use `pl_backfill` only after one-day processing is healthy, with a short date range first. It runs dates sequentially and can consume substantial Spark capacity.
+10. Create the new workspace's schedules only after validation. Keep Dev schedules disabled while configuring; production schedules and alert routes are separate workspace-level setup.
+
+### First-load note
+
+`nb_setup_ddl` only creates platform schemas/tables; it does not create source workspaces, source data, connections, semantic models, or reports. The simulator/source workspace is a separate prerequisite. The repository currently does not include `sm_sales`, `rpt_sales`, or `rpt_platform_health`; deploy and validate the Gold layer first, then create/bind those BI items separately.
 
 The checked-in pipeline activities use the Fabric Git workspace placeholder
 `00000000-0000-0000-0000-000000000000`; Git sync must bind notebook references to

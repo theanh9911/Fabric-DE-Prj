@@ -36,8 +36,11 @@ if p_clean_schema:
             objects = []
         for obj in objects:
             object_name = f"{schema_name}.{obj['tableName']}"
-            spark.sql(f"DROP VIEW IF EXISTS {object_name}")
-            spark.sql(f"DROP TABLE IF EXISTS {object_name}")
+            catalog_object = spark.catalog.getTable(object_name)
+            if catalog_object.tableType.upper() == "VIEW":
+                spark.sql(f"DROP VIEW IF EXISTS {object_name}")
+            else:
+                spark.sql(f"DROP TABLE IF EXISTS {object_name}")
 
 # CELL ********************
 
