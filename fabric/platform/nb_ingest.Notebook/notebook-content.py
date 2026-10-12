@@ -61,6 +61,29 @@ def source_lakehouse_path(name, subpath):
     item_id = lakehouse_id(source_ws_id, name)
     return f"abfss://{source_ws_id}@onelake.dfs.fabric.microsoft.com/{item_id}/{subpath}"
 
+def file_source_root(spec):
+    """Resolve the configured source folder, with compatibility for the flat simulator layout."""
+    source_object = spec["source_object"].strip("/")
+    subpaths = [f"Files/{source_object}"]
+    if source_object.startswith("inbound/"):
+        # Some deployed simulator workspaces store entity folders directly under inbound/
+        # (inbound/categories) while the canonical contract groups them by source
+        # (inbound/reference/categories or inbound/retail/<entity>).
+        flat_path = f"Files/inbound/{spec['entity']}"
+        if flat_path not in subpaths:
+            subpaths.append(flat_path)
+
+    resolved = [(subpath, source_lakehouse_path(p_drop_lakehouse, subpath))
+                for subpath in subpaths]
+    for _, path in resolved:
+        if notebookutils.fs.exists(path):
+            return path
+    tried = ", ".join(subpath for subpath, _ in resolved)
+    raise FileNotFoundError(
+        f"No source folder found for {spec['source_system']}.{spec['entity']} "
+        f"in Lakehouse '{p_drop_lakehouse}'. Tried: {tried}"
+    )
+
 def source_jdbc(server, database):
     return f"jdbc:sqlserver://{server}:1433;database={database};encrypt=true;trustServerCertificate=false;loginTimeout=30"
 
@@ -81,7 +104,7 @@ def sql_source_frame(spec, plan):
             .option("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver").load())
 
 def file_source_frame(spec, plan):
-    root = source_lakehouse_path(p_drop_lakehouse, f"Files/{spec['source_object']}")
+    root = file_source_root(spec)
     files = [f for f in notebookutils.fs.ls(root) if not f.isDir]
     start = plan.get("window_start")
     candidates = []
