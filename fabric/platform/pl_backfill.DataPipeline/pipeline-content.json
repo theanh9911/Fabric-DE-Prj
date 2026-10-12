@@ -1,46 +1,148 @@
 {
   "properties": {
     "parameters": {
-      "p_start_date": {"type": "String"},
-      "p_end_date": {"type": "String"},
-      "p_mode": {"type": "String", "defaultValue": "normal"},
-      "p_source_workspace": {"type": "String", "defaultValue": "CompanyA-Source"},
-      "p_erp_item": {"type": "String", "defaultValue": "sqldb_erp_wholesale"},
-      "p_drop_lakehouse": {"type": "String", "defaultValue": "lh_retail_drop"}
+      "p_start_date": {
+        "type": "String"
+      },
+      "p_end_date": {
+        "type": "String"
+      },
+      "p_mode": {
+        "type": "String",
+        "defaultValue": "normal"
+      },
+      "p_source_workspace": {
+        "type": "String",
+        "defaultValue": "CompanyA-Source"
+      },
+      "p_erp_item": {
+        "type": "String",
+        "defaultValue": "sqldb_erp_wholesale"
+      },
+      "p_drop_lakehouse": {
+        "type": "String",
+        "defaultValue": "lh_retail_drop"
+      }
     },
-    "variables": {"v_dates": {"type": "Array"}},
+    "variables": {
+      "v_dates": {
+        "type": "Array"
+      }
+    },
     "activities": [
       {
-        "name": "build_dates", "type": "SetVariable", "dependsOn": [],
+        "name": "build_dates",
+        "type": "SetVariable",
+        "dependsOn": [],
         "typeProperties": {
           "variableName": "v_dates",
-          "value": {"value": "@range(0,add(div(sub(ticks(pipeline().parameters.p_end_date),ticks(pipeline().parameters.p_start_date)),864000000000),1))", "type": "Expression"}
+          "value": {
+            "value": "@range(0,add(div(sub(ticks(pipeline().parameters.p_end_date),ticks(pipeline().parameters.p_start_date)),864000000000),1))",
+            "type": "Expression"
+          }
         }
       },
       {
-        "name": "run_each_day", "type": "ForEach",
-        "dependsOn": [{"activity": "build_dates", "dependencyConditions": ["Succeeded"]}],
+        "name": "run_each_day",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "build_dates",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
         "typeProperties": {
           "isSequential": true,
-          "items": {"value": "@variables('v_dates')", "type": "Expression"},
+          "items": {
+            "value": "@variables('v_dates')",
+            "type": "Expression"
+          },
           "activities": [
             {
-              "name": "run_master_daily", "type": "ExecutePipeline", "dependsOn": [],
-              "policy": {"timeout": "0.12:00:00", "retry": 0, "retryIntervalInSeconds": 30},
+              "name": "run_master_daily",
+              "type": "Notebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 60
+              },
               "typeProperties": {
-                "pipeline": {"referenceName": "8e1de8bc-337d-45d8-b442-2305b3d34009", "type": "PipelineReference"},
-                "waitOnCompletion": true,
+                "notebookId": "4e1f6cbd-c7ae-4f53-a29b-a449a43fa007",
                 "workspaceId": "00000000-0000-0000-0000-000000000000",
                 "parameters": {
-                  "p_load_date": {"value": {"value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')", "type": "Expression"}, "type": "string"},
-                  "p_load_date_to": {"value": {"value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')", "type": "Expression"}, "type": "string"},
-                  "p_mode": {"value": {"value": "@pipeline().parameters.p_mode", "type": "Expression"}, "type": "string"},
-                  "p_from_layer": {"value": {"value": "ingest", "type": "Expression"}, "type": "string"},
-                  "p_entities": {"value": {"value": "ALL", "type": "Expression"}, "type": "string"},
-                  "p_full_reload": {"value": {"value": false, "type": "Expression"}, "type": "bool"},
-                  "p_source_workspace": {"value": {"value": "@pipeline().parameters.p_source_workspace", "type": "Expression"}, "type": "string"},
-                  "p_erp_item": {"value": {"value": "@pipeline().parameters.p_erp_item", "type": "Expression"}, "type": "string"},
-                  "p_drop_lakehouse": {"value": {"value": "@pipeline().parameters.p_drop_lakehouse", "type": "Expression"}, "type": "string"}
+                  "p_run_id": {
+                    "value": {
+                      "value": "",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_load_date": {
+                    "value": {
+                      "value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_load_date_to": {
+                    "value": {
+                      "value": "@formatDateTime(addDays(pipeline().parameters.p_start_date,item()),'yyyy-MM-dd')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_mode": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_mode",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_from_layer": {
+                    "value": {
+                      "value": "ingest",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_entities": {
+                    "value": {
+                      "value": "ALL",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_full_reload": {
+                    "value": {
+                      "value": false,
+                      "type": "Expression"
+                    },
+                    "type": "bool"
+                  },
+                  "p_source_workspace": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_source_workspace",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_erp_item": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_erp_item",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_drop_lakehouse": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_drop_lakehouse",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  }
                 }
               }
             }

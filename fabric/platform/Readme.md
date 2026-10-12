@@ -6,8 +6,9 @@ there is no Bronze Delta table.
 
 ## Main flow
 
-`pl_master_daily` invokes `pl_daily_core`, which runs `nb_ingest_plan`,
-`nb_ingest`, and `nb_process`. Processing writes source-specific Silver tables,
+`pl_master_daily` runs `nb_process` directly. `pl_backfill` runs the same notebook
+sequentially for each requested date. `pl_daily_core` remains a standalone runner.
+Processing writes source-specific Silver tables,
 the shared order event and snapshot history, Gold dimensions/fact/aggregate,
 quarantine, and DQ/reconciliation results.
 

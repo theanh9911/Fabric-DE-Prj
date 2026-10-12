@@ -8,7 +8,7 @@ truth, [`ARCHITECTURE.md`](ARCHITECTURE.md).
 | Stage | Fabric items | Implemented behavior |
 |---|---|---|
 | Bootstrap | `nb_setup_ddl`, `nb_config`, `nb_common` | `slv`, `gld`, `meta`; three metadata tables; configuration validated from Git |
-| Ingest | `pl_master_daily`, `pl_daily_core`, `nb_ingest_plan`, `nb_ingest` | source windows, SQL Database and drop-zone reads, snapshot checksum, immutable per-delivery Landing and manifest |
+| Ingest | `pl_master_daily`, `pl_backfill`, `pl_daily_core`, `nb_ingest_plan`, `nb_ingest` | master and serial backfill call `nb_process` as notebook activities; source windows, SQL Database and drop-zone reads, snapshot checksum, immutable per-delivery Landing and manifest |
 | Silver | `nb_slv_load` | current state per source, append-only order events and snapshot observations, technical quarantine, audit/watermark |
 | Gold | `nb_gld_dims`, `nb_gld_fact` | date/customer/product/salesman dimensions, SCD2 from snapshot history, current recognized-sales fact and monthly aggregate |
 | Quality/ops | `nb_dq`, `nb_ops_recon`, `nb_process`, `nb_sla_watch` | critical DQ checks, fact-to-aggregate and delivery accounting, normal/rerun selection, missing daily delivery warnings |
