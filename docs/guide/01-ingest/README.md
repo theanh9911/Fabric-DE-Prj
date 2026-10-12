@@ -1,5 +1,7 @@
 # Bước 1 — Ingest happy path ▶
 
+> **Lưu ý phiên bản:** sơ đồ và các bước dưới đây mô tả pipeline activity design `pl_ingest` đang được ghi lại cho hướng dẫn. Repo triển khai hiện tại dùng `pl_master_daily` với một `TridentNotebook` activity gọi `nb_process`, rồi gọi các notebook con trong cùng luồng. Khi thao tác trên workspace hiện tại, dùng [platform-implementation.md](../../platform-implementation.md) và [nhật ký lỗi](99-loi-da-gap.md); không tạo lại các activity `pl_ingest` cũ theo sơ đồ bên dưới.
+
 **Mục tiêu:** `pl_ingest(p_load_date)` lấy phần mới của 9 nguồn → landing → Bronze; audit theo stage trong `ingestion_batch`; tiến watermark sau commit từng entity (không lùi). Rerun/recovery dùng `p_batch_id` để giữ nguyên input. Trạng thái chạy, thời lượng, lỗi: Monitoring hub.
 
 Thiết kế: [design/03 ingest](../../design/03-ingest.md) · [04 control tables](../../design/04-control-tables.md) · [05 bronze](../../design/05-bronze.md).

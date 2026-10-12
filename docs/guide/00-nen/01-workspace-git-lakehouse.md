@@ -16,9 +16,9 @@ Workspace `CompanyA-DataPlatform-Dev` nối Git (nhánh `dev`, thư mục `fabri
 
 ## Làm
 1. Workspace settings → **Git integration** → Connect: repo `Fabric-DE-Prj`, Branch **`dev`**, Git folder **`fabric/platform`** → Connect and sync.
-2. Workspace settings → **Data Engineering/Science → Spark settings**:
+2. Workspace settings → **Data Engineering/Science → Spark settings** (các thiết lập dưới đây là lịch sử; không bật/tắt High Concurrency chỉ để hỗ trợ `%%configure`):
    - Tab **Environment** → Runtime version **2.0 (Spark 4.1, Delta 4.2)** → Save.
-   - Tab **High concurrency** → **tắt** "For notebooks" → Save (để `%%configure` chạy được).
+   - Tab **High concurrency** → giữ theo chính sách/capacity của workspace. Notebook platform hiện không dùng `%%configure`; cấu hình Lakehouse bằng Data items/default binding như mô tả trong [runbook lỗi Fabric](99-loi-da-gap.md).
 3. New item → **Lakehouse** → tên `lh_platform` → **tick "Lakehouse schemas"** → Create.
 4. Source control → **Commit**.
 

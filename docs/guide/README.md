@@ -11,6 +11,11 @@
 | [source.md](source.md) | Source là gì, dữ liệu đi từ CSV gốc tới nguồn ra sao, virtual clock |
 | [source-bang-cot.md](source-bang-cot.md) | Từng bảng, từng cột của Source |
 
+## Tra cứu lỗi
+
+- Lỗi Spark session/capacity, notebook binding, import, Git và pipeline: [00-nen/99-loi-da-gap.md](00-nen/99-loi-da-gap.md).
+- Lỗi ingest, source path, Landing, cleanup schema và tham số chạy: [01-ingest/99-loi-da-gap.md](01-ingest/99-loi-da-gap.md).
+
 ## Khuôn mỗi file thao tác
 
 1. **Mục tiêu** — xong thì có gì.
