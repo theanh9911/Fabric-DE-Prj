@@ -7,11 +7,6 @@
 # META   "dependencies": {}
 # META }
 
-# CELL ********************
-
-# MAGIC %%configure -f
-# MAGIC { "defaultLakehouse": { "name": "lh_platform" } }
-
 # PARAMETERS CELL ********************
 
 p_optimize = True

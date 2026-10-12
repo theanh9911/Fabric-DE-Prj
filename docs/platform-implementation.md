@@ -22,11 +22,12 @@ No Bronze schema, `cfg_*` tables, or `state_*` tables are created. `meta` has
 ## Deploy sequence
 
 1. Connect the Fabric Dev workspace to this folder/branch and sync the items.
-2. Confirm the source workspace and lakehouse names in `pl_master_daily` parameters.
-3. Grant the executing identity read access to the source SQL Database and drop-zone Lakehouse, and write access to the platform Lakehouse.
-4. Run `nb_setup_ddl`, then run `nb_config` to validate configuration.
-5. Run `pl_master_daily` with a simulator date and a single small entity first; then run all sources and replay the same date with `p_mode=rerun`.
-6. Inspect Landing manifests, `meta.ingestion_batch`, Silver/Gold counts, quarantine, `meta.check_result`, and pipeline monitoring before scheduling.
+2. In each notebook that accesses platform tables, use **Data items → Add data items** to attach `lh_platform`, then set it as the default Lakehouse. Enable **Lakehouse Auto-Binding in Git** in notebook Git settings and commit the generated binding metadata.
+3. Confirm the source workspace and lakehouse names in `pl_master_daily` parameters.
+4. Grant the executing identity read access to the source SQL Database and drop-zone Lakehouse, and write access to the platform Lakehouse.
+5. Run `nb_setup_ddl`, then run `nb_config` to validate configuration.
+6. Run `pl_master_daily` with a simulator date and a single small entity first; then run all sources and replay the same date with `p_mode=rerun`.
+7. Inspect Landing manifests, `meta.ingestion_batch`, Silver/Gold counts, quarantine, `meta.check_result`, and pipeline monitoring before scheduling.
 
 The checked-in pipeline activities use the Fabric Git workspace placeholder
 `00000000-0000-0000-0000-000000000000`; Git sync must bind notebook references to
@@ -40,6 +41,9 @@ list and read those source items.
   permissions, OneLake binary copy semantics, CDF/table property support, and
   semantic-model framing) still needs a deploy smoke run. The repository can be
   syntax-checked locally but cannot prove these workspace behaviors.
+- Default Lakehouse attachment is workspace metadata configured through the
+  notebook UI. The notebooks no longer force a session restart with
+  `%%configure -f`; each notebook still needs Spark compute when run.
 - The platform reads CSV drop-zone files via Spark for row counts and copies the
   original bytes to Landing. File modified-time filtering uses `modifyTime` when
   the OneLake listing exposes it; if absent, the runner includes the file and

@@ -11,11 +11,6 @@
 
 p_clean_schema = False
 
-# CELL ********************
-
-# MAGIC %%configure -f
-# MAGIC { "defaultLakehouse": { "name": "lh_platform" } }
-
 # METADATA ********************
 
 # META {

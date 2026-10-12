@@ -34,3 +34,13 @@ bound by Fabric Git integration in the target workspace.
 
 Semantic model/report items are not yet present in this folder. Add and bind them
 after the Gold schema has been deployed and inspected in the target workspace.
+
+## Notebook Lakehouse binding
+
+Notebooks no longer use `%%configure -f` to choose the default Lakehouse. In the
+Dev workspace, add `lh_platform` through each notebook's **Data items** pane and
+set it as the default Lakehouse. Enable **Lakehouse Auto-Binding in Git** in the
+notebook Git settings and commit the generated binding metadata to the branch.
+Attach it to every notebook that reads or writes platform tables. A Spark session
+is still required to run these notebooks; removing `%%configure -f` avoids its
+forced session restart, not the underlying Spark compute.
