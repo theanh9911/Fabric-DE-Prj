@@ -256,9 +256,22 @@ import sempy.fabric as fabric
 
 _ws = fabric.resolve_workspace_id(p_source_workspace)
 _lh = fabric.resolve_item_id(p_drop_lakehouse, "Lakehouse", _ws)
+from datetime import datetime, timezone
+
+# Giống nb_plan (04 §3.3 bước 6): khoảng last modified lấy từ chính danh sách file ở drop zone.
+_mt = [f.modifyTime for f in notebookutils.fs.ls(
+    f"abfss://{_ws}@onelake.dfs.fabric.microsoft.com/{_lh}/Files/inbound/retail/orders") if f.name.endswith(".csv")]
+
+
+def _iso(ms):
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 notebookutils.notebook.exit(json.dumps({
     "source_workspace_id": _ws,
     "drop_lakehouse_id": _lh,
+    "modified_start": _iso(min(_mt)) if _mt else None,
+    "modified_end": _iso(max(_mt) + 1000) if _mt else None,
     "sources": [{"id": f"src{i}", "query": "SELECT * FROM dbo.t " + "x" * p_exit_pad}
                 for i in range(p_exit_items)],
 }))
