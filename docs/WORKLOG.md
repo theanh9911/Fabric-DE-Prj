@@ -96,3 +96,11 @@ Người/agent: Claude (Sonnet 5.5); chạy trên Fabric: anhnguyen
 - Tài liệu: 04 (§5.4 categories, §6.3 R-PRD-02, §6.5 thêm `first_returned_at_utc`), 05 §2.2 (từ điển).
 Còn lại cho T1.2: E02b (định dạng thời gian master) rồi chuyển contract `active`; xác nhận múi giờ retail (D41); trả lời D42.
 Kiểm chứng Fabric: EDA đã chạy; chưa có code v2 nào chạy.
+## 2026-10-15 — T1.2 Hoàn thiện contract — REVIEW
+Người/agent: Claude (Sonnet 5.5), theo chỉ đạo người dùng: giả định hợp lý khi mơ hồ, theo thực hành production.
+Đã làm:
+- 9 contract `status: active`; `build_contracts.py --strict` PASS.
+- D42 (số âm: giữ nguyên + FLAG, R-ORD-05), D43 (giả định có ghi lại: định dạng thời gian master retail, `a/b/yyyy` đọc d/M, format lạ ⇒ REJECT).
+- Tài liệu: 03 §4, 04 §7.2, §8 (R-ORD-05), §13 (DQ-SLV-05), 05 §2.3 (`flag_negative`), §3.3.
+Chưa xác nhận với owner nguồn: múi giờ retail (D41), định dạng thời gian file master (D43). E02b không cần chạy nữa.
+Kiểm chứng Fabric: không áp dụng (chỉ cấu hình và tài liệu).

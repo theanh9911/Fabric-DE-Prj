@@ -2,7 +2,7 @@ apiVersion: v3.0.2
 kind: DataContract
 id: wholesale.sales_hierarchy
 version: 1.0.0
-status: draft
+status: active
 description:
   purpose: Current sales organisation of the wholesale ERP (salesman and direct manager).
   limitations: >

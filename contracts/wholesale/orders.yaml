@@ -2,7 +2,7 @@ apiVersion: v3.0.2
 kind: DataContract
 id: wholesale.orders
 version: 1.0.0
-status: draft
+status: active
 description:
   purpose: >
     Order line status events from the wholesale ERP. A new row is inserted every time an order

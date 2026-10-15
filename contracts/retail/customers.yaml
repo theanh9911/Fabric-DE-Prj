@@ -2,13 +2,14 @@ apiVersion: v3.0.2
 kind: DataContract
 id: retail.customers
 version: 1.1.0
-status: draft
+status: active
 description:
   purpose: Customer master of the retail channel, delivered as a full snapshot file whenever it changes.
   limitations: >
     All values are text with local time and no time zone. A key missing from a newer snapshot
     means the customer was removed at the source. The same customer_code may exist in wholesale
     with different attributes (gender, country, city). Gender values have spelling variants.
+    Timestamps are assumed to use the same format as retail.orders (yyyy-MM-dd HH:mm:ss).
   usage: Read-only. File customers_YYYYMMDD.csv, full snapshot, only on change.
 schema:
   - name: customers
@@ -76,7 +77,7 @@ customProperties:
   - property: sourceTimezone
     value: Asia/Ho_Chi_Minh
   - property: timestampFormats
-    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+    value: ["yyyy-MM-dd HH:mm:ss"]
   - property: deliveryCadence
     value: on_change
   - property: quarantineWarnPct

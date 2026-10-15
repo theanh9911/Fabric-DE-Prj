@@ -581,6 +581,7 @@ Khoá chống ghi trùng: `(entity, delivery_id, business_key, reason, row_json)
 | `future_order_date` | REJECT | R-ORD-01 | nguồn |
 | `invalid_tax_rate` | FLAG | R-STD-06; dòng vào với `tax_rate = NULL` | nguồn hoặc `TAX_WORDS` |
 | `ambiguous_date` | FLAG | R-STD-04 | xác nhận với nguồn |
+| `negative_quantity`, `negative_price` | FLAG | R-ORD-05; giá trị âm vẫn vào bảng nguyên vẹn | xác nhận với nguồn |
 | `unmapped_value` | FLAG | giá trị không có trong từ điển gender/position/brand | từ điển |
 | `duplicate_key_in_snapshot` | FLAG | R-MST-01; dòng trùng không vào history | nguồn |
 | `self_manager` | FLAG | quản lý trỏ chính mình; `salesmanager_code` đặt NULL | nguồn |
@@ -609,6 +610,7 @@ Notebook của object liệt kê ID rule nó áp dụng ở cell Markdown đầu
 | R-ORD-01 | Silver | `order_date > to_date(_batch_id) + SETTINGS.future_order_days` ⇒ REJECT `future_order_date` |
 | R-ORD-02 | Silver | Trùng event key trong cùng lượt: giữ `_delivered_at_utc` mới nhất, rồi `_row_no` lớn nhất |
 | R-ORD-03 | Silver | Trùng event key với dòng đã có: cập nhật chỉ khi delivery mới hơn và `_record_hash` khác |
+| R-ORD-05 | Silver | `quantity < 0` hoặc `price < 0` ⇒ giữ nguyên giá trị, FLAG `negative_quantity` / `negative_price`; không REJECT và không sửa dấu (có thể là điều chỉnh hay trả hàng hợp lệ) |
 | R-ORD-04 | Silver | Dòng hiện hành của dòng hàng: `updated_at_utc` mới nhất; hoà thì `status_rank` cao hơn, rồi `_delivered_at_utc`, `_row_no` |
 | R-MST-01 | Silver | Trùng khoá (contract `primaryKey`) trong một snapshot: giữ `_row_no` nhỏ nhất; dòng còn lại FLAG `duplicate_key_in_snapshot` |
 | R-MST-02 | Silver | Khoá có ở snapshot trước, vắng ở snapshot sau ⇒ dòng `DELETE` tại `_snapshot_date` của snapshot sau |
@@ -990,7 +992,7 @@ Ba nguồn check, cùng ghi `meta.check_result`:
 | DQ-SLV-02 | `slv.orders_event` | `not_null` | `order_no, product_code, order_status, order_date, updated_at_utc` | critical | touched |
 | DQ-SLV-03 | `slv.*_history` (4) | `unique` | `source_system, <key>, _snapshot_date` | critical | touched |
 | DQ-SLV-04 | delivery của lượt | `quarantine_rate` | `rows_rejected / rows_read` so `quarantineWarnPct` / `quarantineFailPct` của contract | warning / critical | run |
-| DQ-SLV-05 | `slv.orders_event` | `flag_count` | dòng có `ambiguous_date` | warning (> 0) | touched |
+| DQ-SLV-05 | `slv.orders_event` | `flag_count` | dòng có `ambiguous_date`, `negative_quantity`, `negative_price` | warning (> 0) | touched |
 | DQ-SLV-06 | delivery của lượt | `schema_drift` | `schema_added` hoặc `schema_missing` khác rỗng | warning | run |
 | DQ-SLV-07 | `slv.orders_event` | `event_date_vs_file` | dòng từ file `orders_<yyyyMMdd>.csv` có ngày của `updated_at_utc` (múi giờ nguồn) lệch tên file hơn 1 ngày | warning (> 0) | touched |
 | DQ-GLD-01 | `gld.dim_*` (4) | `unique` | SK | critical | full |

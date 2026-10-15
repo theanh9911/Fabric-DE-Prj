@@ -21,7 +21,7 @@ CONTRACTS = {
     "reference.categories": {
         "id": "reference.categories",
         "version": "1.1.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "reference",
         "entity": "categories",
         "physical_name": "inbound/reference/categories",
@@ -60,7 +60,7 @@ CONTRACTS = {
     "retail.customers": {
         "id": "retail.customers",
         "version": "1.1.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "retail",
         "entity": "customers",
         "physical_name": "inbound/retail/customers",
@@ -88,7 +88,7 @@ CONTRACTS = {
         "file_glob": "*.csv",
         "settle_minutes": 5,
         "source_timezone": "Asia/Ho_Chi_Minh",
-        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"],
+        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss"],
         "date_formats": None,
         "delivery_cadence": "on_change",
         "available_by_local_time": None,
@@ -98,7 +98,7 @@ CONTRACTS = {
     "retail.orders": {
         "id": "retail.orders",
         "version": "1.1.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "retail",
         "entity": "orders",
         "physical_name": "inbound/retail/orders",
@@ -142,7 +142,7 @@ CONTRACTS = {
     "retail.products": {
         "id": "retail.products",
         "version": "1.1.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "retail",
         "entity": "products",
         "physical_name": "inbound/retail/products",
@@ -168,7 +168,7 @@ CONTRACTS = {
         "file_glob": "*.csv",
         "settle_minutes": 5,
         "source_timezone": "Asia/Ho_Chi_Minh",
-        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"],
+        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss"],
         "date_formats": None,
         "delivery_cadence": "on_change",
         "available_by_local_time": None,
@@ -178,7 +178,7 @@ CONTRACTS = {
     "retail.sales_hierarchy": {
         "id": "retail.sales_hierarchy",
         "version": "1.1.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "retail",
         "entity": "sales_hierarchy",
         "physical_name": "inbound/retail/sales_hierarchy",
@@ -208,7 +208,7 @@ CONTRACTS = {
         "file_glob": "*.csv",
         "settle_minutes": 5,
         "source_timezone": "Asia/Ho_Chi_Minh",
-        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"],
+        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss"],
         "date_formats": None,
         "delivery_cadence": "on_change",
         "available_by_local_time": None,
@@ -218,7 +218,7 @@ CONTRACTS = {
     "wholesale.customers": {
         "id": "wholesale.customers",
         "version": "1.0.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "wholesale",
         "entity": "customers",
         "physical_name": "dbo.customers",
@@ -256,7 +256,7 @@ CONTRACTS = {
     "wholesale.orders": {
         "id": "wholesale.orders",
         "version": "1.0.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "wholesale",
         "entity": "orders",
         "physical_name": "dbo.orders",
@@ -302,7 +302,7 @@ CONTRACTS = {
     "wholesale.products": {
         "id": "wholesale.products",
         "version": "1.0.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "wholesale",
         "entity": "products",
         "physical_name": "dbo.products",
@@ -338,7 +338,7 @@ CONTRACTS = {
     "wholesale.sales_hierarchy": {
         "id": "wholesale.sales_hierarchy",
         "version": "1.0.0",
-        "status": "draft",
+        "status": "active",
         "source_system": "wholesale",
         "entity": "sales_hierarchy",
         "physical_name": "dbo.sales_hierarchy",

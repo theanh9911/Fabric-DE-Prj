@@ -104,6 +104,7 @@ Một phần tử mỗi bảng Silver.
 | `keep_raw` | | tên cột lưu giá trị gốc đã trim |
 | `reject_reason` | | mã REJECT thay mã mặc định của `std` |
 | `flag_reason` | | không parse được ⇒ NULL + FLAG mã này (không REJECT) |
+| `flag_negative` | | giá trị < 0 ⇒ giữ nguyên + FLAG mã này (không REJECT) |
 
 Ví dụ `slv.orders_event` (đầy đủ):
 
@@ -123,9 +124,9 @@ dict(table="slv.orders_event", entity="orders", kind="event", notebook="nb_slv_o
             keep_raw="order_status_raw", reject_reason="unknown_order_status"),
        dict(name="status_rank", type="int", std="lookup:STATUS_RANK", from_column="order_status"),
        dict(name="quantity", type="decimal(18,2)", std="decimal", required=True,
-            reject_reason="invalid_quantity"),
+            reject_reason="invalid_quantity", flag_negative="negative_quantity"),
        dict(name="price", type="decimal(18,2)", std="decimal", required=True,
-            reject_reason="invalid_price"),
+            reject_reason="invalid_price", flag_negative="negative_price"),
        dict(name="tax_rate", type="decimal(9,6)", std="tax_rate", keep_raw="tax_rate_raw",
             flag_reason="invalid_tax_rate"),
        dict(name="created_at_utc", type="timestamp", std="ts", source="created_at"),
@@ -260,6 +261,7 @@ Quy tắc dựng:
      when(flag_reason và giá trị NULL và nguồn không NULL, flag_reason)
      when(std dict:* không required và giá trị NULL và nguồn không NULL, 'unmapped_value')
      when(std date/ts và is_ambiguous_dm(nguồn), 'ambiguous_date')
+     when(flag_negative và giá trị < 0, flag_negative)
    Với dict:* không required, giá trị NULL được thay bằng std_title(nguồn) (R-STD-08).
 5. event: _event_key theo event_keys (cast string).
 ```

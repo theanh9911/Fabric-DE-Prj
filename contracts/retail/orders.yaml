@@ -2,7 +2,7 @@ apiVersion: v3.0.2
 kind: DataContract
 id: retail.orders
 version: 1.1.0
-status: draft
+status: active
 description:
   purpose: >
     Order line status events from the retail channel, delivered as CSV files in the shared drop

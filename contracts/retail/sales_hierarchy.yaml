@@ -2,12 +2,13 @@ apiVersion: v3.0.2
 kind: DataContract
 id: retail.sales_hierarchy
 version: 1.1.0
-status: draft
+status: active
 description:
   purpose: Sales organisation of the retail channel, delivered as a full snapshot file whenever it changes.
   limitations: >
     All values are text. salesmanager_code references salesman_code of the same file; some rows
     point to themselves. The creation time column is named inserted_at, as in the ERP.
+    Timestamps are assumed to use the same format as retail.orders (yyyy-MM-dd HH:mm:ss).
   usage: Read-only. File sales_hierarchy_YYYYMMDD.csv, full snapshot, only on change.
 schema:
   - name: sales_hierarchy
@@ -81,7 +82,7 @@ customProperties:
   - property: sourceTimezone
     value: Asia/Ho_Chi_Minh
   - property: timestampFormats
-    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+    value: ["yyyy-MM-dd HH:mm:ss"]
   - property: deliveryCadence
     value: on_change
   - property: quarantineWarnPct

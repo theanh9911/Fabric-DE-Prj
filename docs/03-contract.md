@@ -121,7 +121,7 @@ Check ID sinh tự động: `CT-<id>-<số thứ tự 2 chữ số>`, ví dụ `
 | `active` | đã duyệt | nạp |
 | `retired` | đã ngừng | không nạp; nhánh DAG của nó bị bỏ |
 
-Cả 9 contract hiện là `draft`: cột của file retail và categories, định dạng thời gian và múi giờ ERP chưa được xác nhận. T0.3 (EDA) rồi T1.2 chuyển sang `active`.
+Cả 9 contract là `active` từ 2026-10-15 (T1.2): cột và định dạng đã đối chiếu với EDA ([EDA.md](EDA.md)); múi giờ retail và định dạng thời gian file master là giả định ghi ở [DECISIONS D41, D43](DECISIONS.md#2-mô-hình-và-nghiệp-vụ).
 
 ## 5. Phiên bản và quy trình đổi
 

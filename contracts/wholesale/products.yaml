@@ -2,7 +2,7 @@ apiVersion: v3.0.2
 kind: DataContract
 id: wholesale.products
 version: 1.0.0
-status: draft
+status: active
 description:
   purpose: Current product master of the wholesale ERP.
   limitations: >
