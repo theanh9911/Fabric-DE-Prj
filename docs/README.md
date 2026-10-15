@@ -32,4 +32,4 @@ Bộ tài liệu này là **nguồn sự thật duy nhất** về thiết kế, 
 
 ## Trạng thái hiện tại (2026-10-14)
 
-Code trong `fabric/platform/` là bản v1 cũ, **chưa sửa**; sẽ được viết lại toàn bộ theo [06-tasks.md](06-tasks.md) trên workspace Dev sau khi reset. Tài liệu trong thư mục này mô tả thiết kế đích (v2), không mô tả v1.
+Code trong `fabric/platform/` đang được viết lại từng task theo [06-tasks.md](06-tasks.md); notebook còn là bản cũ (v1) sẽ bị viết đè ở task tương ứng. Tài liệu trong thư mục này mô tả thiết kế đích (v2), không mô tả v1.

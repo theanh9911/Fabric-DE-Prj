@@ -81,3 +81,10 @@ Người/agent: Claude (Sonnet 5.5)
 - `nb_spike`: thêm tham số `p_fail`, `p_exit_items`, `p_exit_pad`, trả `exitValue` (ID Source, danh sách `sources`) và hướng dẫn dựng `pl_spike` (K06, K07, K08, K11, K12) trong cell Markdown.
 Phát hiện: drop zone Source có hai layout (phẳng `inbound/<entity>/` ghi 6/10 bởi simulator cũ — v1 cũng đọc đường dẫn này; `inbound/retail/<entity>/` ghi 12/10 chỉ có ngày 20260102). Contract trỏ layout mới; xử lý bằng reset Source ở T2.6.
 Kiểm chứng Fabric: chưa kiểm chứng (chưa chạy `nb_eda`, `pl_spike`).
+## 2026-10-15 — Đổi hướng: làm lại từ đầu, nguồn coi như sẵn sàng (D38) — DONE
+Người/agent: Claude (Sonnet 5.5), theo yêu cầu người dùng.
+Đã làm:
+- Bỏ T0.1 (baseline v1); T2.6 không còn phụ thuộc T0.1, T0.3 và không reset nguồn; T8.1 đối chiếu với nguồn (Q19 mới = số tính từ ERP).
+- `nb_eda` đọc trực tiếp nguồn (drop zone CSV + Delta của item SQL Database trên OneLake), bỏ baseline và Landing v1; không cần `lh_platform`.
+- Thêm bảng "Phụ thuộc và thứ tự chạy" vào 06-tasks.
+Chưa kiểm chứng: đọc `Tables/dbo/<bảng>` của item SQL Database bằng đường dẫn OneLake; kiểu item `SQLDatabase` cho `resolve_item_id`.

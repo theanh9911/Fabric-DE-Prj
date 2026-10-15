@@ -34,6 +34,7 @@ Mỗi quyết định có ID cố định. Đổi một quyết định: thêm d
 | D35 | Ingest bằng Copy activity qua Connection (DB và file); notebook không đọc nguồn, chỉ liệt kê tên file (`nb_plan`) và kiểm tra staging (`nb_land`) | bài tập phải phản ánh dự án thật: nguồn sau gateway/Connection, credentials ngoài code (tiếp nối quyết định 2026-10-06) | 2026-10-14 |
 | D36 | `conform` sinh câu Spark SQL từ cấu hình; Python chỉ ghép chuỗi | SQL-first: logic biến đổi là SQL, team đọc và sửa được | 2026-10-14 |
 | D37 | Mỗi Notebook activity có thể khởi động Spark riêng; đo thời gian và số lần khởi động ở T8.3 trước khi tối ưu (chia sẻ session) | L12 | 2026-10-14 |
+| D38 | Làm lại từ đầu, không dựa vào dữ liệu hay code v1: bỏ T0.1 (baseline), EDA đọc trực tiếp nguồn, T8.1 đối chiếu với nguồn; nguồn coi như đã sẵn sàng (đúng layout contract) và không reset ở T2.6. Bổ sung D18 | không còn gì của v1 cần so hoặc giữ; EDA không phụ thuộc Landing v1 nên không phải làm trước reset | 2026-10-15 |
 
 ## 2. Mô hình và nghiệp vụ
 

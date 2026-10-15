@@ -11,50 +11,65 @@
 
 # MARKDOWN ********************
 
-# # nb_eda (T0.1 + T0.3 — tạm, xoá ở T8.4)
-# Chỉ đọc. Gắn `lh_platform` làm default lakehouse rồi Run all; dán toàn bộ output cho người review.
+# # nb_eda (T0.3 — tạm, xoá ở T8.4)
+# Khảo sát nguồn **trực tiếp**, chỉ đọc: file CSV ở drop zone và bảng ERP (Delta của item SQL Database trên OneLake).
+# Không cần `lh_platform`, không cần dữ liệu platform nào. Run all rồi dán toàn bộ output cho người review.
 #
-# - Cell "Baseline v1": Q19 của docs/07 §4 (T0.1).
-# - Các cell còn lại: E01–E20 của docs/EDA.md (T0.3) trên `Files/landing/*/<source>/<entity>/run=*/` của v1.
+# Phụ thuộc: nguồn đã có dữ liệu (đã chạy `nb_00_sim_daily` initial load) và identity chạy có quyền đọc workspace Source.
+# Checklist: docs/EDA.md (E01–E20).
 #
 # Mỗi file CSV được đọc riêng rồi `unionByName` (header có thể khác nhau giữa các file; đọc gộp sẽ áp header của file đầu cho mọi file).
 
+# PARAMETERS CELL ********************
+
+p_source_workspace = "CompanyA-Source"
+p_drop_lakehouse = "lh_retail_drop"
+p_erp_item = "sqldb_erp_wholesale"
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # CELL ********************
 
+import sempy.fabric as fabric
 from pyspark.sql import functions as F
 
 NULL_LIKE = ["", "NULL", "N/A", "NA", "NONE", "NIL", "-"]
 
-
-def landing_files(source, entity, ext):
-    out = []
-    root = "Files/landing"
-    if not notebookutils.fs.exists(root):
-        return out
-    for b in notebookutils.fs.ls(root):
-        d = f"{b.path}/{source}/{entity}"
-        if not notebookutils.fs.exists(d):
-            continue
-        for r in notebookutils.fs.ls(d):
-            if r.name.startswith("run="):
-                out += [f.path for f in notebookutils.fs.ls(r.path) if f.name.endswith(ext)]
-    return sorted(out)
+WS = fabric.resolve_workspace_id(p_source_workspace)
+DROP = fabric.resolve_item_id(p_drop_lakehouse, "Lakehouse", WS)
+ERP = fabric.resolve_item_id(p_erp_item, "SQLDatabase", WS)
+ONELAKE = f"abfss://{WS}@onelake.dfs.fabric.microsoft.com"
+print("workspace", WS, "| drop", DROP, "| erp", ERP)
 
 
-def load(source, entity, fmt):
-    paths = landing_files(source, entity, ".parquet" if fmt == "parquet" else ".csv")
+def landing_files(source, entity, ext=".csv"):
+    if source == "wholesale":
+        return []
+    d = f"{ONELAKE}/{DROP}/Files/inbound/{source}/{entity}"
+    if not notebookutils.fs.exists(d):
+        return []
+    return sorted(f.path for f in notebookutils.fs.ls(d) if f.name.endswith(".csv"))
+
+
+def load(source, entity, fmt=None):
+    if source == "wholesale":
+        df = spark.read.format("delta").load(f"{ONELAKE}/{ERP}/Tables/dbo/{entity}")
+        df = df.select([F.col(c).cast("string").alias(c.strip().lower()) for c in df.columns])
+        return df.withColumn("_file", F.lit("erp"))
+    paths = landing_files(source, entity)
     if not paths:
         return None
-    if fmt == "parquet":
-        df = spark.read.parquet(*paths)
-        df = df.select([F.col(c).cast("string").alias(c.strip().lower()) for c in df.columns])
-        return df.withColumn("_file", F.input_file_name())
     out = None
     for p in paths:
         d = (spark.read.option("header", True).option("multiLine", True).option("escape", '"')
              .option("inferSchema", False).csv(p))
         d = d.select([F.col(c).cast("string").alias(c.strip().lower()) for c in d.columns])
-        d = d.withColumn("_file", F.lit(p.split("/landing/")[-1]))
+        d = d.withColumn("_file", F.lit(p.rsplit("/", 1)[-1]))
         out = d if out is None else out.unionByName(d, allowMissingColumns=True)
     return out
 
@@ -100,42 +115,20 @@ def guard(fn):
 
 # CELL ********************
 
-section("Baseline v1 (Q19)")
-for sch in ("meta", "slv", "gld"):
-    print(f"\n>> bảng hiện có trong {sch}")
-    guard(lambda: spark.sql(f"SHOW TABLES IN {sch}").select("tableName").show(100, truncate=False))
-for sql in [
-    "SELECT floor(date_key / 100) AS month_key, count(*) n, sum(gross_amount) gross, "
-    "count_if(salesman_sk = -1) unk_salesman FROM gld.gld_f_sales_line GROUP BY 1 ORDER BY 1",
-    "SELECT stage, entity, dq_reason, count(*) n FROM slv.quarantine GROUP BY ALL ORDER BY 1, 2, 3",
-    "SELECT source_system, entity, status, count(*) n, sum(rows_read) rows_read "
-    "FROM meta.ingestion_batch GROUP BY ALL ORDER BY 1, 2, 3",
-]:
-    print("\n>>", sql[:90])
-    guard(lambda: spark.sql(sql).show(200, truncate=False))
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 D = {}
-for s, fmt in (("retail", "csv"), ("wholesale", "parquet")):
+for s in ("retail", "wholesale"):
     for e in ("orders", "customers", "products", "sales_hierarchy"):
-        D[(s, e)] = load(s, e, fmt)
-D[("reference", "categories")] = (load("reference", "categories", "csv")
-                                  or load("retail", "categories", "csv")
-                                  or load("wholesale", "categories", "parquet"))
+        try:
+            D[(s, e)] = load(s, e)
+        except Exception as ex:
+            print(f"!! không đọc được {(s, e)}: {type(ex).__name__}: {str(ex)[:300]}")
+            D[(s, e)] = None
+D[("reference", "categories")] = load("reference", "categories")
 
 for k, v in D.items():
     if v is not None:
         v.cache()
-    print(k, "KHÔNG CÓ DỮ LIỆU" if v is None else f"{v.count()} dòng, {len(landing_files(k[0], k[1], '.csv' if k[0] != 'wholesale' else '.parquet'))} file")
-
+    print(k, "KHÔNG CÓ DỮ LIỆU" if v is None else f"{v.count()} dòng, {max(len(landing_files(k[0], k[1])), 1)} file")
 ro, wo = D[("retail", "orders")], D[("wholesale", "orders")]
 ORDERS = [("retail", ro), ("wholesale", wo)]
 MASTERS = [(k, v) for k, v in D.items() if k[1] != "orders" and v is not None]
@@ -163,7 +156,7 @@ def e01():
         heads = {}
         for p in files:
             h = notebookutils.fs.head(p, 4000).split("\n", 1)[0].strip().lstrip("﻿")
-            heads.setdefault(h, []).append(p.split("/landing/")[-1])
+            heads.setdefault(h, []).append(p.rsplit("/", 1)[-1])
         print((s, e), f"{len(files)} file, {len(heads)} header khác nhau")
         for h, fs in heads.items():
             print("   ", h, "<=", len(fs), "file, ví dụ", fs[0])

@@ -1,25 +1,31 @@
 # EDA — Khảo sát dữ liệu nguồn (T0.3)
 
-Làm trên Landing v1 (chỉ đọc), **trước** khi reset Dev (T2.6). Mỗi mục: truy vấn đã chạy, kết quả rút gọn, kết luận, giá trị điền vào. Kết quả dùng ở T1.2 (contract) và T2.1 (từ điển trong `nb_config`).
+Làm trực tiếp trên nguồn, chỉ đọc (D38): file CSV ở drop zone `lh_retail_drop/Files/inbound/**` và bảng ERP (Delta của item `sqldb_erp_wholesale` trên OneLake). Không cần dữ liệu platform. Mỗi mục: truy vấn đã chạy, kết quả rút gọn, kết luận, giá trị điền vào. Kết quả dùng ở T1.2 (contract) và T2.1 (từ điển trong `nb_config`).
+
+Điều kiện: nguồn đã có dữ liệu (initial load xong). Chạy bằng `nb_eda` (tạm, xoá ở T8.4); notebook tìm workspace và item theo tên, không cần ID.
 
 ## Chuẩn bị (cell đầu `nb_eda`)
 
 ```python
+import sempy.fabric as fabric
 from pyspark.sql import functions as F
 
-def landing(source_system, entity, fmt):
-    pattern = f"Files/landing/*/{source_system}/{entity}/run=*/" + ("*.parquet" if fmt == "parquet" else "*.csv")
-    df = (spark.read.parquet(pattern) if fmt == "parquet" else
-          spark.read.option("header", True).option("multiLine", True).option("escape", '"').csv(pattern))
-    return (df.select([F.col(c).cast("string").alias(c) for c in df.columns])
-              .withColumn("_file", F.input_file_name()))
+WS = fabric.resolve_workspace_id("CompanyA-Source")
+DROP = fabric.resolve_item_id("lh_retail_drop", "Lakehouse", WS)
+ERP = fabric.resolve_item_id("sqldb_erp_wholesale", "SQLDatabase", WS)
+ONELAKE = f"abfss://{WS}@onelake.dfs.fabric.microsoft.com"
+
+def csv_of(source, entity):          # mỗi file đọc riêng rồi unionByName: header có thể khác nhau
+    files = [f.path for f in notebookutils.fs.ls(f"{ONELAKE}/{DROP}/Files/inbound/{source}/{entity}")]
+    ...
+
+def erp_of(entity):
+    return spark.read.format("delta").load(f"{ONELAKE}/{ERP}/Tables/dbo/{entity}")
 
 def shape(c):
     return F.regexp_replace(F.regexp_replace(F.col(c), "[0-9]", "9"), "[A-Za-z]", "a")
-
-ro, wo = landing("retail", "orders", "csv"), landing("wholesale", "orders", "parquet")
 ```
-
+Mã đầy đủ ở `nb_eda`. Nếu `Tables/dbo/<bảng>` của item SQL Database không đọc được bằng đường dẫn OneLake thì ghi lại cách đọc thay thế vào [DECISIONS §3](DECISIONS.md#3-kết-quả-spike).
 ## Checklist
 
 | # | Câu hỏi | Cách xem | Điền vào |

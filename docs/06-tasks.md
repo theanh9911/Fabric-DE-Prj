@@ -4,7 +4,22 @@ Làm theo vòng lặp trong [CLAUDE.md](../CLAUDE.md#4-vòng-lặp-một-task). 
 
 Cách dựng: dựng dọc từng lớp. Nền tảng và pipeline khung có trước; mỗi task Silver/Gold sau đó bật object của mình (`is_active = True`), thêm activity vào `pl_master_daily`, thêm check và đối soát của mình. Nhờ vậy sau mỗi task, `pl_master_daily` chạy được từ đầu tới cuối và kiểm chứng được trên dữ liệu thật.
 
-Code v1 hiện có trong `fabric/platform/` được giữ nguyên tới T2.6 (cần để lấy baseline và EDA), sau đó bị thay thế hoặc xoá trong các task tương ứng.
+Làm lại từ đầu, không dựa vào dữ liệu hay code v1 (D38): không có baseline v1, EDA đọc trực tiếp nguồn. Nguồn (`CompanyA-Source`) coi như đã sẵn sàng: đã reset và đã chạy `nb_00_sim_daily` initial load theo đúng layout contract.
+
+## Phụ thuộc và thứ tự chạy
+
+Cột "Cần sẵn" là điều kiện phải có **trước khi** bắt đầu task; cột bảng trạng thái bên dưới là phụ thuộc giữa các task.
+
+| Pha | Cần sẵn trên Fabric | Làm được local (không cần Fabric) |
+|---|---|---|
+| P0 | Source có dữ liệu (initial load xong); workspace Platform nối Git, `lh_platform`; quyền đọc workspace Source | T0.4 |
+| P1 | — | T1.1; T1.2 cần kết quả EDA (T0.3) |
+| P2 | `lh_platform` gắn default cho từng notebook; K01–K10 đã kiểm (T0.2) | viết code T2.1–T2.4 |
+| P3 | Connection tới `sqldb_erp_wholesale` và `lh_retail_drop` (Copy activity); `nb_setup_ddl` đã chạy (T2.4) | viết `nb_plan`, `nb_land`, pipeline |
+| P4–P5 | Landing có delivery (M1) | viết Silver, Gold |
+| P6 | kênh cảnh báo (Teams hoặc Outlook, theo K07) | |
+| P7 | workspace Source | `nb_00_sim_inject` |
+| P8 | M4 đạt | |
 
 **Làm T0.2 (spike) trước tiên.** Thiết kế dựa trên các giả định runtime chưa kiểm chứng (CDF `table_changes`, `fs.mv`, `modifyTime`, `try_to_timestamp`, Copy activity với ID động, nhánh lỗi của pipeline); sai giả định nào thì sửa tài liệu trước khi viết code.
 
@@ -25,7 +40,7 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 
 | Task | Tên | Trạng thái | Phụ thuộc |
 |---|---|---|---|
-| T0.1 | Baseline số liệu v1 | TODO | — |
+| T0.1 | Baseline số liệu v1 | BỎ (D38) | — |
 | T0.2 | Spike runtime K01–K12 | TODO | — |
 | T0.3 | EDA nguồn | TODO | — |
 | T0.4 | `pyproject.toml` + `tools/check_repo.py` | TODO | — |
@@ -36,7 +51,7 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | T2.3 | `nb_common` | TODO | T2.1, T2.2 |
 | T2.4 | `nb_setup_ddl` | TODO | T2.1 |
 | T2.5 | `nb_test_unit` | TODO | T2.3 |
-| T2.6 | Reset Dev | TODO | T0.1, T0.3, T2.4 |
+| T2.6 | Reset Dev | TODO | T2.4 |
 | T3.1 | `nb_plan` | TODO | T2.5, T2.6 |
 | T3.2 | `nb_land` | TODO | T3.1 |
 | T3.3 | `pl_master_daily` (khung: plan, ingest, close) + Connection | TODO | T3.2, T0.2 |
@@ -53,7 +68,7 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | T6.3 | `nb_maintenance` + `pl_maintenance` | TODO | T5.5 |
 | T6.4 | `nb_ops_delivery` | TODO | T4.1 |
 | T7.1 | `nb_00_sim_inject` (workspace Source) | TODO | — |
-| T8.1 | Chạy toàn bộ lịch sử, so baseline | TODO | T6.1 |
+| T8.1 | Chạy toàn bộ lịch sử, đối chiếu nguồn | TODO | T6.1 |
 | T8.2 | Diễn tập sự cố + `nb_test_e2e` | TODO | T7.1, T8.1 |
 | T8.3 | 7 ngày giả lập liên tục | TODO | T8.2 |
 | T8.4 | Dọn item tạm | TODO | T8.3 |
@@ -65,11 +80,8 @@ Trạng thái: `TODO`, `IN_PROGRESS`, `REVIEW` (code + docs xong, chờ kiểm c
 
 ## P0 — Chuẩn bị
 
-### T0.1 — Baseline số liệu v1
-- **Mục đích:** có số để giải thích chênh lệch khi v2 chạy (T8.1).
-- **File:** `docs/WORKLOG.md`.
-- **Việc làm:** trên Dev hiện tại, sau một lượt v1 `p_entities=ALL` thành công, chạy Q19 và dán kết quả (kèm `run_id`, ngày giả lập `released_until`).
-- **Xong khi:** WORKLOG có mục "Baseline v1".
+### T0.1 — Baseline số liệu v1 — BỎ
+Quyết định D38: làm lại từ đầu, không so với v1. Số liệu v2 được đối chiếu với chính nguồn ở T8.1.
 
 ### T0.2 — Spike runtime K01–K12
 - **Mục đích:** xác nhận giả định runtime trước khi viết code dựa trên chúng.
@@ -96,14 +108,13 @@ Trạng thái: `TODO`, `IN_PROGRESS`, `REVIEW` (code + docs xong, chờ kiểm c
 ### T0.3 — EDA nguồn
 - **Mục đích:** chốt các giá trị phụ thuộc dữ liệu: tên cột file, định dạng thời gian, múi giờ ERP, biến thể trạng thái/thuế/gender/position/brand.
 - **File:** `docs/EDA.md`, `fabric/platform/nb_eda.Notebook/` (xoá ở T8.4).
-- **Việc làm:** làm đủ checklist [EDA.md](EDA.md) trên Landing v1 hiện có (chỉ đọc). Phải xong **trước** T2.6.
+- **Việc làm:** làm đủ checklist [EDA.md](EDA.md) trực tiếp trên nguồn (CSV ở drop zone, bảng ERP), chỉ đọc. Cần nguồn đã có dữ liệu.
 - **Xong khi:** mọi mục E01–E20 có kết quả và kết luận; mục "Điền vào" của từng mục đã rõ giá trị.
 
 ### T0.4 — `pyproject.toml` + `tools/check_repo.py`
 - **File:** `pyproject.toml`, `tools/check_repo.py`.
 - **Việc làm:** theo [05 §6.2](05-thu-vien.md#62-toolscheck_repopy). C10 bỏ qua khi `tools/build_contracts.py` chưa có; C11, C12 bỏ qua khi `nb_setup_ddl`, `nb_config` chưa phải bản v2 (bật ở T2.4).
-- **Xong khi:** `uv run tools/check_repo.py` chạy trên repo; cố ý thêm `%run` chung cell vào một file tạm ⇒ C02 báo lỗi. Lỗi của code v1 (nếu có) liệt kê trong WORKLOG, không sửa v1.
-
+- **Xong khi:** `uv run tools/check_repo.py` chạy trên repo; cố ý thêm `%run` chung cell vào một file tạm ⇒ C02 báo lỗi.
 ---
 
 ## P1 — Contract
@@ -150,8 +161,8 @@ Trạng thái: `TODO`, `IN_PROGRESS`, `REVIEW` (code + docs xong, chờ kiểm c
 - **Xong khi:** mọi test PASS; cố ý làm sai `std_code` ⇒ test FAIL.
 
 ### T2.6 — Reset Dev
-- **Việc làm:** theo [07 §1.2](07-van-hanh-kiem-thu.md#12-reset-dev).
-- **Xong khi:** Q18 chỉ còn object v2 rỗng; `lh_retail_drop/Files/inbound` trống; `lh_sim.sim_state` không còn.
+- **Việc làm:** theo [07 §1.2](07-van-hanh-kiem-thu.md#12-reset-dev), **chỉ phần platform** (bước 3, 4): nguồn đã sẵn sàng nên không reset. Workspace platform mới tinh thì chỉ cần Q18 xác nhận không còn object lạ.
+- **Xong khi:** Q18 chỉ còn object v2 rỗng.
 
 ---
 
@@ -281,8 +292,8 @@ Mỗi task: viết notebook, bật object trong `GOLD`, thêm check của bảng
 
 ## P8 — Đưa vào chạy
 
-### T8.1 — Chạy toàn bộ lịch sử, so baseline
-- **Việc làm:** simulator initial load + 14 ngày (`pl_backfill`); chạy Q20; mọi chênh lệch so baseline phải giải thích được (ví dụ: salesman không còn `-1` do R-SLM-02; dòng retail không còn bị quarantine do format; fact v2 là mọi dòng hàng chứ không chỉ Delivered). Ghi bảng giải thích vào WORKLOG.
+### T8.1 — Chạy toàn bộ lịch sử, đối chiếu nguồn
+- **Việc làm:** simulator initial load + 14 ngày (`pl_backfill`); chạy Q20; đối chiếu độc lập với nguồn (số dòng và tổng `quantity * price` tính trực tiếp từ bảng ERP và file CSV); mọi chênh lệch phải giải thích được bằng quarantine hoặc rule. Ghi bảng giải thích vào WORKLOG.
 - **Xong khi:** mọi check, đối soát PASS hoặc WARN có giải thích.
 
 ### T8.2 — Diễn tập sự cố + `nb_test_e2e`

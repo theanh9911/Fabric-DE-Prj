@@ -25,13 +25,13 @@ Identity chạy pipeline cần: quyền dùng hai Connection tới `sqldb_erp_wh
 
 ### 1.2 Reset Dev
 
-Chỉ ở Dev. Xoá mọi dữ liệu nguồn và platform để chạy lại từ đầu.
+Chỉ ở Dev. Đưa platform về trống để chạy lại từ đầu. Bước 2 và 5 (dựng lại nguồn) chỉ làm khi cần dữ liệu nguồn mới; khi nguồn đã sẵn sàng thì bỏ qua.
 
 1. Đảm bảo không có pipeline nào đang chạy.
-2. Workspace Source: chạy `nb_00_sim_reset` với `p_confirm = "RESET"`.
+2. (Chỉ khi dựng lại nguồn) Workspace Source: chạy `nb_00_sim_reset` với `p_confirm = "RESET"`.
 3. Workspace Dev: chạy `nb_setup_ddl` với `p_reset = True`, `p_confirm = "RESET"`.
-4. Kiểm: Q18 chỉ còn object rỗng; `lh_retail_drop/Files/inbound` trống.
-5. Workspace Source: chạy `nb_00_sim_daily` (lần đầu = initial load tới 2025-12-31). Exit value là `p_load_date` cho lượt platform đầu tiên.
+4. Kiểm: Q18 chỉ còn object rỗng; nếu đã reset nguồn thì `lh_retail_drop/Files/inbound` trống.
+5. (Chỉ khi dựng lại nguồn) Workspace Source: chạy `nb_00_sim_daily` (lần đầu = initial load tới 2025-12-31). Exit value là `p_load_date` cho lượt platform đầu tiên.
 
 ### 1.3 Promote Prod
 
@@ -210,15 +210,14 @@ FROM meta.check_result WHERE run_id = '<run_id>' ORDER BY status DESC, check_id;
 SHOW TABLES IN meta; SHOW TABLES IN slv; SHOW TABLES IN gld;
 SHOW TBLPROPERTIES gld.fct_order_line ('delta.enableChangeDataFeed');
 ```
-**Q19 — baseline v1** (chạy ở T0.1, trước khi reset)
+**Q19 — số tính trực tiếp từ nguồn ERP** (chạy ở SQL endpoint của `sqldb_erp_wholesale`, chỉ đọc; dùng ở T8.1)
 ```sql
-SELECT floor(date_key / 100) AS month_key, count(*) n, sum(gross_amount) gross,
-       count_if(salesman_sk = -1) unk_salesman
-FROM gld.gld_f_sales_line GROUP BY 1 ORDER BY 1;
-SELECT stage, entity, dq_reason, count(*) FROM slv.quarantine GROUP BY ALL ORDER BY 1, 2, 3;
-SELECT source_system, entity, status, count(*), sum(rows_read) FROM meta.ingestion_batch GROUP BY ALL;
+SELECT COUNT(*) AS n_events,
+       COUNT(DISTINCT CONCAT(order_no, '|', product_code)) AS n_lines,
+       SUM(quantity * price) AS gross_events
+FROM dbo.orders;
 ```
-**Q20 — v2 so với baseline** (cùng định nghĩa với v1: dòng Delivered, theo tháng `order_date`, `quantity * price`)
+**Q20 — v2 theo tháng** (dòng Delivered, theo tháng `order_date`, `quantity * price`; đối chiếu với nguồn ở T8.1)
 ```sql
 SELECT floor(order_date_key / 100) AS month_key, count(*) n, sum(quantity * price) gross,
        count_if(salesman_sk = -1) unk_salesman
