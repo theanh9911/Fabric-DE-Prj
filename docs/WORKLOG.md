@@ -126,3 +126,10 @@ Người dùng quyết định bỏ K06 (không thực tế dựng lượt chạ
 Còn lại của T0.2: K07 (Teams), K11c (ID động).
 ## 2026-10-15 — Đính chính K11e
 Mục "T0.2 K11e (tiếp)" và commit `6918d5c` ghi "Copy không tạo thư mục đích khi 0 file" là **chưa kiểm chứng** (thư mục đích đã có từ trước nên không phân biệt được). Đã sửa 04 §3.1 và DECISIONS: nb_land xử lý cả hai trường hợp. Nguyên nhân: lệnh ghi bị ngắt bởi người dùng vẫn hoàn tất; từ nay sẽ kiểm `git log` sau khi bị ngắt.
+## 2026-10-15 — T2.1 nb_config — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Đã làm: viết lại `nb_config` theo 05 §2: `SETTINGS`, từ điển (từ EDA), `SILVER` (5 bảng), `GOLD` (5 bảng), `CHECKS` rỗng, `validate_config()` V01–V10; chạy độc lập được (`%run nb_contracts` ở cell đầu). Mọi `is_active = False` cho tới các task Silver/Gold.
+File: fabric/platform/nb_config.Notebook/notebook-content.py (giữ nguyên logicalId và khối META của bản cũ).
+Tài liệu đã sửa: 06-tasks (trạng thái).
+Kiểm tra local: nạp `nb_contracts` + `nb_config` bằng Python thuần ⇒ "Validated 9 contracts, 5 silver, 5 gold, 0 checks"; thêm chu trình vào GOLD ⇒ V06 báo "gld.dim_date -> gld.fct_order_line -> gld.dim_date". `check_repo.py` OK.
+Kiểm chứng Fabric: chưa kiểm chứng (chưa chạy notebook trên Fabric).

@@ -41,12 +41,12 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | Task | Tên | Trạng thái | Phụ thuộc |
 |---|---|---|---|
 | T0.1 | Baseline số liệu v1 | BỎ (D38) | — |
-| T0.2 | Spike runtime K01–K12 | TODO | — |
-| T0.3 | EDA nguồn | TODO | — |
-| T0.4 | `pyproject.toml` + `tools/check_repo.py` | TODO | — |
-| T1.1 | `tools/build_contracts.py` + `nb_contracts` | TODO | T0.4 |
-| T1.2 | Hoàn thiện contract và từ điển theo EDA | TODO | T0.3, T1.1 |
-| T2.1 | `nb_config` | TODO | T1.2, T0.2 |
+| T0.2 | Spike runtime K01–K12 | IN_PROGRESS (còn K07, K11c) | — |
+| T0.3 | EDA nguồn | DONE | — |
+| T0.4 | `pyproject.toml` + `tools/check_repo.py` | REVIEW | — |
+| T1.1 | `tools/build_contracts.py` + `nb_contracts` | REVIEW | T0.4 |
+| T1.2 | Hoàn thiện contract và từ điển theo EDA | REVIEW | T0.3, T1.1 |
+| T2.1 | `nb_config` | REVIEW | T1.2, T0.2 |
 | T2.2 | `nb_std` | TODO | T0.2 |
 | T2.3 | `nb_common` | TODO | T2.1, T2.2 |
 | T2.4 | `nb_setup_ddl` | TODO | T2.1 |
