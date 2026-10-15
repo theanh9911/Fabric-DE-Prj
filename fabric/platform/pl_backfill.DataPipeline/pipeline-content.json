@@ -1,0 +1,118 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "dates",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "267aceb4-372e-47fa-b276-117ded1e2a5c",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_start_date": {
+              "value": {
+                "value": "@pipeline().parameters.p_start_date",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_end_date": {
+              "value": {
+                "value": "@pipeline().parameters.p_end_date",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "for_each_day",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "dates",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@json(activity('dates').output.result.exitValue).dates",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "run_day",
+              "type": "InvokePipeline",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "operationType": "InvokeFabricPipeline",
+                "pipelineId": "22eef9d9-ec64-4471-a70a-363b3586c02b",
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
+                "waitOnCompletion": true,
+                "parameters": {
+                  "p_load_date": {
+                    "value": "@item()",
+                    "type": "Expression"
+                  },
+                  "p_mode": "normal",
+                  "p_source_workspace": {
+                    "value": "@pipeline().parameters.p_source_workspace",
+                    "type": "Expression"
+                  },
+                  "p_erp_item": {
+                    "value": "@pipeline().parameters.p_erp_item",
+                    "type": "Expression"
+                  },
+                  "p_drop_lakehouse": {
+                    "value": "@pipeline().parameters.p_drop_lakehouse",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "externalReferences": {
+                "connection": "00000000-0000-0000-0000-000000000000"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "p_start_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "p_end_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "p_source_workspace": {
+        "type": "String",
+        "defaultValue": "CompanyA-Source"
+      },
+      "p_erp_item": {
+        "type": "String",
+        "defaultValue": "sqldb_erp_wholesale"
+      },
+      "p_drop_lakehouse": {
+        "type": "String",
+        "defaultValue": "lh_retail_drop"
+      }
+    },
+    "concurrency": 1
+  }
+}

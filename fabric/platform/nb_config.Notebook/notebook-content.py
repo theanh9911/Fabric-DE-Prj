@@ -79,7 +79,7 @@ _HISTORY_TECH_HASH_EXCLUDE = ["created_at_utc", "updated_at_utc"]
 
 SILVER = [
     dict(table="slv.orders_event", entity="orders", kind="event", notebook="nb_slv_orders",
-         logic_version=1, is_active=False,
+         logic_version=1, is_active=True,
          business_keys=["order_no", "product_code"],
          event_keys=["order_no", "product_code", "order_status", "updated_at_utc"],
          hash_exclude=["order_status_raw", "tax_rate_raw", "created_at_utc"],
@@ -103,7 +103,7 @@ SILVER = [
                   reject_reason="invalid_updated_at"),
          ]),
     dict(table="slv.customers_history", entity="customers", kind="snapshot", notebook="nb_slv_master",
-         logic_version=1, is_active=False,
+         logic_version=1, is_active=True,
          business_keys=["customer_code"],
          hash_exclude=_HISTORY_TECH_HASH_EXCLUDE + ["gender_raw"],
          columns=[
@@ -117,7 +117,7 @@ SILVER = [
              dict(name="updated_at_utc", type="timestamp", std="ts", source="updated_at"),
          ]),
     dict(table="slv.products_history", entity="products", kind="snapshot", notebook="nb_slv_master",
-         logic_version=1, is_active=False,
+         logic_version=1, is_active=True,
          business_keys=["product_code"],
          hash_exclude=_HISTORY_TECH_HASH_EXCLUDE + ["brand_raw"],
          columns=[
@@ -129,7 +129,7 @@ SILVER = [
              dict(name="updated_at_utc", type="timestamp", std="ts", source="updated_at"),
          ]),
     dict(table="slv.sales_hierarchy_history", entity="sales_hierarchy", kind="snapshot",
-         notebook="nb_slv_master", logic_version=1, is_active=False,
+         notebook="nb_slv_master", logic_version=1, is_active=True,
          business_keys=["salesman_code"],
          hash_exclude=_HISTORY_TECH_HASH_EXCLUDE + ["position_raw"],
          columns=[
@@ -143,7 +143,7 @@ SILVER = [
              dict(name="updated_at_utc", type="timestamp", std="ts", source="updated_at"),
          ]),
     dict(table="slv.categories_history", entity="categories", kind="snapshot", notebook="nb_slv_master",
-         logic_version=1, is_active=False,
+         logic_version=1, is_active=True,
          business_keys=["category_code"],
          hash_exclude=[],
          columns=[
@@ -156,29 +156,77 @@ SILVER = [
 ]
 
 GOLD = [
-    dict(table="gld.dim_date", notebook="nb_gld_dim_date", logic_version=1, is_active=False,
+    dict(table="gld.dim_date", notebook="nb_gld_dim_date", logic_version=1, is_active=True,
          inputs=[], grain=["date_key"], rules=[]),
-    dict(table="gld.dim_customer", notebook="nb_gld_dim_customer", logic_version=1, is_active=False,
+    dict(table="gld.dim_customer", notebook="nb_gld_dim_customer", logic_version=1, is_active=True,
          inputs=[dict(table="slv.customers_history", read="full"), dict(table="slv.orders_event", read="cdf")],
          grain=["customer_code"], rules=["R-CUS-01", "R-CUS-02", "R-INF-01"]),
-    dict(table="gld.dim_product", notebook="nb_gld_dim_product", logic_version=1, is_active=False,
+    dict(table="gld.dim_product", notebook="nb_gld_dim_product", logic_version=1, is_active=True,
          inputs=[dict(table="slv.products_history", read="full"),
                  dict(table="slv.categories_history", read="full"),
                  dict(table="slv.orders_event", read="cdf")],
          grain=["product_code"], rules=["R-PRD-01", "R-PRD-02", "R-INF-01"]),
-    dict(table="gld.dim_salesman", notebook="nb_gld_dim_salesman", logic_version=1, is_active=False,
+    dict(table="gld.dim_salesman", notebook="nb_gld_dim_salesman", logic_version=1, is_active=True,
          inputs=[dict(table="slv.sales_hierarchy_history", read="full"), dict(table="slv.orders_event", read="cdf")],
          grain=["source_system", "salesman_code", "valid_from"],
          rules=["R-SLM-01", "R-SLM-02", "R-SLM-03", "R-SLM-04"]),
-    dict(table="gld.fct_order_line", notebook="nb_gld_fct_order_line", logic_version=1, is_active=False,
+    dict(table="gld.fct_order_line", notebook="nb_gld_fct_order_line", logic_version=1, is_active=True,
          inputs=[dict(table="slv.orders_event", read="cdf"), dict(table="gld.dim_salesman", read="cdf"),
                  dict(table="gld.dim_customer", read="dep"), dict(table="gld.dim_product", read="dep"),
                  dict(table="gld.dim_date", read="dep")],
          grain=["source_system", "order_no", "product_code"], rules=["R-ORD-04", "R-SLM-05"]),
 ]
 
-# Mỗi task Silver/Gold thêm check của mình ở đây (docs/04-kien-truc.md §13).
-CHECKS = []
+# Danh mục check nền tảng (docs/04-kien-truc.md §13). DQ-OPS-01 do nb_sla_watch chạy.
+def _chk(check_id, obj, type_, severity, scope, params=None, threshold=None, description=None):
+    c = dict(check_id=check_id, object=obj, type=type_, severity=severity, scope=scope)
+    if params:
+        c["params"] = params
+    if threshold is not None:
+        c["threshold"] = threshold
+    if description:
+        c["description"] = description
+    return c
+
+
+_HISTORY_KEYS = {"slv.customers_history": "customer_code", "slv.products_history": "product_code",
+                 "slv.sales_hierarchy_history": "salesman_code", "slv.categories_history": "category_code"}
+_DIMS = {"gld.dim_customer": "customer_sk", "gld.dim_product": "product_sk",
+         "gld.dim_salesman": "salesman_sk", "gld.dim_date": "date_key"}
+
+CHECKS = (
+    [_chk("DQ-SLV-01", "slv.orders_event", "unique", "critical", "touched", {"cols": ["_event_key"]}),
+     _chk("DQ-SLV-02", "slv.orders_event", "not_null", "critical", "touched",
+          {"cols": ["order_no", "product_code", "order_status", "order_date", "updated_at_utc"]})]
+    + [_chk(f"DQ-SLV-03.{t}", t, "unique", "critical", "touched", {"cols": ["source_system", k, "_snapshot_date"]})
+       for t, k in _HISTORY_KEYS.items()]
+    + [_chk("DQ-SLV-04", "meta.delivery_log", "quarantine_rate", "critical", "run"),
+       _chk("DQ-SLV-05", "slv.orders_event", "flag_count", "warning", "touched",
+            {"flags": ["ambiguous_date", "negative_quantity", "negative_price"]}),
+       _chk("DQ-SLV-06", "meta.delivery_log", "schema_drift", "warning", "run"),
+       _chk("DQ-SLV-07", "slv.orders_event", "event_date_vs_file", "warning", "touched")]
+    + [_chk(f"DQ-GLD-01.{t}", t, "unique", "critical", "full", {"cols": [sk]}) for t, sk in _DIMS.items()]
+    + [_chk("DQ-GLD-02.gld.dim_customer", "gld.dim_customer", "unique", "critical", "full",
+            {"cols": ["customer_code"]}),
+       _chk("DQ-GLD-02.gld.dim_product", "gld.dim_product", "unique", "critical", "full",
+            {"cols": ["product_code"]}),
+       _chk("DQ-GLD-03", "gld.dim_salesman", "scd2_one_current", "critical", "full"),
+       _chk("DQ-GLD-04", "gld.dim_salesman", "scd2_contiguous", "critical", "full"),
+       _chk("DQ-GLD-05", "gld.fct_order_line", "unique", "critical", "touched",
+            {"cols": ["source_system", "order_no", "product_code"]}),
+       _chk("DQ-GLD-06", "gld.fct_order_line", "not_null", "critical", "touched",
+            {"cols": ["customer_sk", "product_sk", "salesman_sk", "order_date_key", "current_status", "quantity",
+                      "price"]}),
+       _chk("DQ-GLD-07", "gld.fct_order_line", "unknown_member_rate", "warning", "touched", threshold=1)]
+    + [_chk(f"DQ-GLD-08.{t}", t, "sk_collision", "critical", "full",
+            {"sk": sk, "natural": {"gld.dim_customer": ["customer_code"], "gld.dim_product": ["product_code"],
+                                   "gld.dim_salesman": ["source_system", "salesman_code", "valid_from"],
+                                   "gld.dim_date": ["date_value"]}[t]})
+       for t, sk in _DIMS.items()]
+    + [_chk("DQ-ING-01", "meta.landed_file", "duplicate_file", "warning", "run"),
+       _chk("DQ-OPS-01", "meta.delivery_log", "freshness", "warning", "run"),
+       _chk("DQ-OPS-03", "meta.delivery_log", "parked_delivery", "warning", "run")]
+)
 
 # METADATA ********************
 

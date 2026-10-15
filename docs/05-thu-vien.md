@@ -278,7 +278,8 @@ Cột "Ai gọi": `P` = `nb_plan`, `W` = notebook Silver/Gold và `nb_land`, `*`
 
 | Hàm | Ai | Chữ ký | Hành vi |
 |---|---|---|---|
-| `utc_now` | * | `() -> datetime` | UTC, không tz |
+| `utc_now` | * | `() -> datetime` | UTC, có `tzinfo` (ghi vào Spark không lệch múi giờ của tiến trình Python) |
+| `iso_utc` | * | `(epoch_ms \| datetime) -> str` | `yyyy-MM-ddTHH:mm:ssZ`, cắt phần giây lẻ |
 | `new_id` | * | `() -> str` | UUID4 |
 | `default_load_date` | P | `() -> str` | hôm qua theo `business_timezone` |
 | `to_batch_id` | * | `(load_date) -> str` | `'2026-01-15'` ⇒ `'20260115'`; sai ⇒ `ValueError` |
@@ -293,6 +294,8 @@ Cột "Ai gọi": `P` = `nb_plan`, `W` = notebook Silver/Gold và `nb_land`, `*`
 | `active_contracts` | `() -> list[dict]` | contract có `status ≠ retired` |
 | `contracts_for_silver` | `(table) -> list[dict]` | contract không `retired` có `silver_table = table` |
 | `get_silver`, `get_gold` | `(table) -> dict` | |
+| `master_entities` | `() -> list[str]` | `entity` của bảng `SILVER` `kind: snapshot`, `is_active` và có contract không `retired` |
+| `hash_columns` | `(silver_spec) -> list[str]` | cột canonical tính vào `_record_hash` (trừ `hash_exclude` và cột `keep_raw`) |
 
 ### 4.3 Tên và path
 
@@ -316,9 +319,10 @@ Cột "Ai gọi": `P` = `nb_plan`, `W` = notebook Silver/Gold và `nb_land`, `*`
 
 | Hàm | Ai | Chữ ký | Hành vi |
 |---|---|---|---|
-| `read_csv_strings` | * | `(paths) -> DataFrame` | options [04 §3.6](04-kien-truc.md#36-đọc-csv); thêm `_source_file`, `_row_no` |
-| `read_landing` | W | `(delivery) -> DataFrame` | Parquet ⇒ đọc rồi cast mọi cột về string; CSV ⇒ `read_csv_strings`. Thêm `source_system`, `_batch_id`, `_delivery_id`, `_delivered_at_utc`, `_snapshot_date` từ `delivery` |
-| `promote_staging` | W | `(delivery_id, landing_path)` | `notebookutils.fs.mv(staging, landing, create_path=True)` |
+| `read_csv_strings` | * | `(paths, base_path=None) -> DataFrame` | options [04 §3.6](04-kien-truc.md#36-đọc-csv); tên cột trim + chữ thường; thêm `_source_file` (tên file), `_row_no`. `base_path` chặn Spark suy ra cột phân vùng `run=` |
+| `read_landing` | W | `(delivery) -> DataFrame` | Parquet ⇒ đọc rồi cast mọi cột về string; CSV ⇒ `read_csv_strings`. Thêm `source_system`, `_batch_id`, `_delivery_id`, `_delivered_at_utc`, `_snapshot_date` từ `delivery` (ưu tiên `delivered_at_str`, `snapshot_date_str` do `select_deliveries` tính bằng SQL) |
+| `list_files` | * | `(path) -> list` | file (đệ quy) dưới `path`; thư mục không tồn tại ⇒ `[]` |
+| `promote_staging` | W | `(delivery_id, landing_path, files=None)` | `files=None` ⇒ `notebookutils.fs.mv(staging, landing, create_path=True)`; có `files` ⇒ chuyển từng file rồi xoá phần còn lại của staging |
 | `write_manifest` | W | `(landing_path, manifest)` | kiểm tra trường bắt buộc ([04 §3.7](04-kien-truc.md#37-manifest)); `put(..., overwrite=False)`; đã có ⇒ lỗi |
 | `read_manifest` | * | `(landing_path) -> dict` | |
 
@@ -331,7 +335,7 @@ Quy ước chung:
 - Input qua `align_to_target`: chọn đúng cột của bảng theo thứ tự, cast về kiểu bảng; cột nullable thiếu ⇒ NULL; cột NOT NULL thiếu ⇒ lỗi; cột thừa ⇒ lỗi.
 - MERGE dựng bằng danh sách cột tường minh.
 - Trước MERGE: input trùng khoá ⇒ `ValueError` kèm tối đa 5 khoá mẫu.
-- Trả `last_commit_metrics(target)`.
+- Trả `last_commit_metrics(target)`; MERGE không tạo commit mới (version không đổi) ⇒ `operation = "NOOP"`, mọi số bằng 0.
 
 | Hàm | Chữ ký | Câu lệnh |
 |---|---|---|
@@ -354,55 +358,63 @@ Quy ước chung:
 
 | Hàm | Chữ ký | Hành vi |
 |---|---|---|
-| `quarantine_rows` | `(df, entity, run_id) -> (int, int)` | dòng có `_reject_reason` ⇒ `action = REJECT`; `explode(_dq_flags)` ⇒ `action = FLAG`; `merge_insert_only` theo khoá chống trùng ([04 §7.1](04-kien-truc.md#71-slvquarantine)); trả (số reject, số flag) |
-| `resolve_quarantine` | `(entity, keys_df, run_id)` | UPDATE `resolved_at_utc`, `resolved_run_id` cho dòng REJECT đang mở có `business_key` trong `keys_df._bk` |
+| `quarantine_frame` | `(df, entity, run_id) -> DataFrame` | dòng có `_reject_reason` ⇒ `action = REJECT`; dòng được nhận, `explode(_dq_flags)` ⇒ `action = FLAG`; `row_json` = `to_json` mọi cột trừ `_reject_reason`, `_dq_flags`, `_row_no`; khử trùng theo khoá chống trùng. `nb_recon` dùng cho RC-03 |
+| `quarantine_rows` | `(df, entity, run_id, table="slv.quarantine") -> (int, int)` | `merge_insert_only` `quarantine_frame` theo khoá chống trùng ([04 §7.1](04-kien-truc.md#71-slvquarantine), so sánh null-safe vì `business_key` có thể NULL); trả (số reject, số flag) |
+| `resolve_quarantine` | `(entity, keys_df, run_id, table="slv.quarantine")` | `keys_df` có `_bk`, `_delivery_id`, `_delivered_at_utc` của dòng hợp lệ. Đặt `resolved_at_utc`, `resolved_run_id` cho dòng REJECT đang mở cùng `business_key` nhưng thuộc **delivery khác** delivery mới nhất của khoá đó (dòng lỗi và dòng đúng cùng delivery không tự đóng nhau) |
 
 ### 4.9 `snapshot_changes(snapshots, previous, key_cols)`
 
-`snapshots`: các snapshot mới đã conform và dedupe (có `source_system`, `_snapshot_date`, `_record_hash`). `previous`: `v_<entity>_current` (incremental) hoặc rỗng (full). Trả các dòng thay đổi kèm `is_deleted`, `_change_type`, không gồm dòng của `previous`.
+`snapshots`: các snapshot mới đã conform và dedupe, có `source_system`, `_snapshot_date`, `_record_hash`, `is_deleted` (= false) và mọi cột của bảng history trừ `_change_type`. `previous`: `v_<entity>_current` (incremental) hoặc rỗng (full). Trả các dòng thay đổi kèm `is_deleted`, `_change_type`, không gồm dòng của `previous`.
+
+Thứ tự (`_seq`) chỉ tính trên ngày của **snapshot mới**; dòng của `previous` có `_seq = 0`. Lý do: history chỉ chứa thay đổi, nên ngày của `previous` không cho biết khoá có mặt hay vắng ở snapshot trung gian; chỉ các snapshot mới là danh sách đầy đủ.
 
 ```sql
-WITH s AS (SELECT *, 0 AS _is_prev FROM snapshots
-           UNION ALL SELECT *, 1 AS _is_prev FROM previous),
+WITH s AS (SELECT <cột>, 0 AS _is_prev FROM snapshots UNION ALL SELECT <cột>, 1 AS _is_prev FROM previous),
 dates AS (SELECT source_system, _snapshot_date,
-                 dense_rank() OVER (PARTITION BY source_system ORDER BY _snapshot_date) AS _seq
-          FROM (SELECT DISTINCT source_system, _snapshot_date FROM s)),
-maxseq AS (SELECT source_system, max(_seq) AS _max_seq FROM dates GROUP BY source_system),
-obs AS (SELECT s.*, d._seq,
-               lag(s._record_hash) OVER w AS _prev_hash,
-               lag(s.is_deleted)   OVER w AS _prev_deleted,
-               lead(d._seq)        OVER w AS _next_seq
-        FROM s JOIN dates d USING (source_system, _snapshot_date)
-        WINDOW w AS (PARTITION BY s.source_system, <keys> ORDER BY d._seq)),
+                 dense_rank() OVER (PARTITION BY source_system ORDER BY _snapshot_date) AS _dseq
+          FROM (SELECT DISTINCT source_system, _snapshot_date FROM snapshots)),
+maxseq AS (SELECT source_system, max(_dseq) AS _max_seq FROM dates GROUP BY source_system),
+obs0 AS (SELECT s.*, CASE WHEN s._is_prev = 1 THEN 0 ELSE d._dseq END AS _seq
+         FROM s LEFT JOIN dates d
+           ON s.source_system = d.source_system AND s._snapshot_date = d._snapshot_date AND s._is_prev = 0),
+obs AS (SELECT *, lag(_record_hash) OVER w AS _prev_hash, lag(is_deleted) OVER w AS _prev_deleted,
+               lag(_seq) OVER w AS _prev_seq, lead(_seq) OVER w AS _next_seq
+        FROM obs0 WINDOW w AS (PARTITION BY source_system, <keys> ORDER BY _seq)),
 upserts AS (SELECT *, CASE WHEN _prev_hash IS NULL THEN 'INSERT'
-                           WHEN _prev_deleted THEN 'REINSERT' ELSE 'UPDATE' END AS _change_type
+                           WHEN _prev_deleted OR _seq > _prev_seq + 1 THEN 'REINSERT' ELSE 'UPDATE' END AS _change_type
             FROM obs
-            WHERE _is_prev = 0 AND (_prev_hash IS NULL OR _prev_deleted OR _record_hash <> _prev_hash)),
+            WHERE _is_prev = 0 AND (_prev_hash IS NULL OR _prev_deleted OR _seq > _prev_seq + 1
+                                    OR _record_hash <> _prev_hash)),
 deletes AS (SELECT o.*, d2._snapshot_date AS _deleted_on
-            FROM obs o JOIN maxseq m USING (source_system)
-            JOIN dates d2 ON d2.source_system = o.source_system AND d2._seq = o._seq + 1
+            FROM obs o JOIN maxseq m ON o.source_system = m.source_system
+            JOIN dates d2 ON d2.source_system = o.source_system AND d2._dseq = o._seq + 1
             WHERE NOT o.is_deleted AND o._seq < m._max_seq
               AND (o._next_seq IS NULL OR o._next_seq > o._seq + 1))
-SELECT <cột>, is_deleted, _snapshot_date, _change_type FROM upserts
+SELECT <cột>, _change_type FROM upserts
 UNION ALL
-SELECT <cột>, true AS is_deleted, _deleted_on AS _snapshot_date, 'DELETE' AS _change_type FROM deletes
+SELECT <cột, với is_deleted = true và _snapshot_date = _deleted_on>, 'DELETE' AS _change_type FROM deletes
 ```
-Test: 3 snapshot (S1: A, B; S2: A, B đã sửa; S3: B, rồi S4: A, B) ⇒ INSERT A, INSERT B (S1), UPDATE B (S2), DELETE A (S3), REINSERT A (S4).
-
+Test: 3 snapshot (S1: A, B; S2: A, B đã sửa; S3: B, rồi S4: A, B) ⇒ INSERT A, INSERT B (S1), UPDATE B (S2), DELETE A (S3), REINSERT A (S4). Incremental: `previous` có A (S1), B (S2); snapshot mới S5 chỉ có A không đổi ⇒ DELETE B tại S5.
 ### 4.10 Trạng thái và quyết định chạy
 
 | Hàm | Ai | Chữ ký | Hành vi |
 |---|---|---|---|
 | `log_run` | * | `(run_id, step, layer, event, **cols)` | append `meta.run_log`; cột không truyền ⇒ NULL |
-| `log_check` | `nb_dq`, `nb_recon`, `nb_sla_watch` | `(run_id, batch_id, check_id, source, check_type, object_name, scope_value, expected, actual, threshold, severity, message=None, sample=None) -> str` | tính `status` (PASS nếu `|actual − expected| ≤ threshold`, ngược lại FAIL nếu critical, WARN nếu warning); số đổi sang `Decimal`; append `meta.check_result`; trả status |
+| `log_check` | `nb_dq`, `nb_recon`, `nb_sla_watch`, `nb_test_e2e` | `(run_id, batch_id, check_id, source, check_type, object_name, scope_value, expected, actual, threshold, severity, message=None, sample=None, status=None) -> str` | tính `status` (PASS nếu `|actual − expected| ≤ threshold`, ngược lại FAIL nếu critical, WARN nếu warning) trừ khi truyền `status` (check ba mức như `quarantine_rate`); số đổi sang `Decimal` 4 chữ số; append `meta.check_result`; trả status |
 | `record_delivery` | `nb_land`, notebook Silver, `nb_ops_delivery` | `(delivery, status, run_id, **silver_metrics)` | append `meta.delivery_log`; `status` ∈ `LANDED`, `LOADED`, `FAILED`, `PARKED`; `delivery` là manifest hoặc dòng `v_pending_delivery` |
 | `record_landed_files` | `nb_plan`, `nb_land` | `(rows, run_id)` | append `meta.landed_file` (`outcome` ∈ `LANDED`, `UNCHANGED`, `SUPERSEDED`) |
 | `state_get` | Silver/Gold | `(target) -> dict | None` | dòng `meta.table_state` của bảng |
 | `state_put` | Silver/Gold | `(target, logic_version, input_versions, output_version, run_id, exec_mode)` | MERGE theo `target_table` |
-| `decide_run` | Silver/Gold | `(target, full_reload, scope) -> dict` | theo [04 §10.2](04-kien-truc.md#102-quyết-định-chạy-từng-node); tự đọc `table_state`, version input, delivery chờ; trả `{decision, exec_mode, reason, input_versions}` với `input_versions = {"<bảng>": {"from": n, "to": m}}` |
-| `resolve_source_ids` | `nb_plan` | `(workspace_name, erp_item, drop_lakehouse) -> dict` | Fabric REST (`sempy.fabric.FabricRestClient`) ⇒ `{source_workspace_id, erp_item_id, drop_lakehouse_id}`; không tìm thấy ⇒ `ValueError` |
-| `list_drop_zone` | `nb_plan` | `(ids, contract) -> list[dict]` | `notebookutils.fs.ls` thư mục `physicalName` của drop zone ⇒ `{name, size, modify_time_utc}`; thiếu `size` hoặc `modifyTime` ⇒ `RuntimeError` |
-| `plan_ingest` | `nb_plan` | `(contracts, ids, load_date, watermarks, landed_files, run_start_utc) -> list` | phần tử `sources` của kế hoạch ([04 §9.1](04-kien-truc.md#91-nb_plan-và-nb_land)); hàm thuần |
+| `select_deliveries` | Silver | `(table, mode="normal", load_from=None, load_to=None, full=False) -> list[dict]` | delivery cần xử lý theo [04 §10.4](04-kien-truc.md#104-chọn-delivery-cho-silver), sắp theo `snapshot_date`, `delivered_at_utc`; thêm `delivered_at_str`, `snapshot_date_str` |
+| `deliveries_of_run` | `nb_dq`, `nb_recon` | `(run_id, statuses, table="meta.v_delivery_state") -> list[dict]` | delivery có trạng thái mới nhất thuộc `run_id` |
+| `decide_run` | Silver/Gold | `(target, full_reload=False, scope="ALL", mode="normal", load_from=None, load_to=None) -> dict` | theo [04 §10.2](04-kien-truc.md#102-quyết-định-chạy-từng-node); tự đọc `table_state`, version input, delivery chờ; trả `{decision, exec_mode, reason, input_versions}` với `input_versions = {"<bảng>": {"from": n, "to": m}}` (chỉ input `full`/`cdf`; Silver là `{}`) |
+| `run_node` | Silver/Gold | `(target, build, run_id, full_reload, scope, mode, load_from, load_to) -> dict` | khung chạy một node: `decide_run` ⇒ SKIP ghi `run_log` và trả kết quả `SKIPPED`; RUN ⇒ `run_log STARTED`, `build(decision)` (ghi dữ liệu, trả dict số liệu; lỗi ⇒ `run_log FAILED` rồi raise), `state_put`, `run_log SUCCEEDED`, `worker_result`. `build` có thể trả `exec_mode`, `reason` (ghi đè), `skip_state` |
+| `gold_audit` | Gold | `(df, run_id, logic_version) -> DataFrame` | thêm `_run_id`, `_logic_version`, `_updated_at_utc` |
+| `resolve_source_ids` | `nb_plan` | `(workspace_name, erp_item, drop_lakehouse) -> dict` | `sempy.fabric.resolve_workspace_id`, `resolve_item_id` (K03) ⇒ `{source_workspace_id, erp_item_id, drop_lakehouse_id}`; không tìm thấy ⇒ `ValueError` |
+| `platform_ids` | `nb_plan` | `() -> dict` | `{platform_workspace_id, platform_lakehouse_id}` của notebook đang chạy; đích của Copy activity (không hardcode ID) |
+| `preflight` | `nb_plan` | `(p_mode, p_load_date, p_load_date_to, p_scope, p_full_reload) -> dict` | PF01–PF08 ([04 §11.2](04-kien-truc.md#112-kiểm-tra-trước-khi-chạy)); trả `{mode, load_date, load_date_to, scope, full_reload, check_scope, batch_id}` đã chuẩn hoá; sai ⇒ `ValueError` bắt đầu bằng mã `PFxx` |
+| `list_drop_zone` | `nb_plan` | `(ids, contract) -> list[dict]` | `notebookutils.fs.ls` thư mục `physicalName` của drop zone, khớp `fileGlob` ⇒ `{name, size, modify_ms}` (`modifyTime` là epoch mili-giây); thư mục chưa có ⇒ `[]`; thiếu `size` hoặc `modifyTime` ⇒ `RuntimeError` |
+| `plan_ingest` | `nb_plan` | `(contracts, load_date, watermarks, landed_files, listings, run_start_utc, batch_id, id_fn=new_id) -> dict` | hàm thuần ⇒ `{sources, no_data, errors, superseded}`. `watermarks`: `{(source_system, entity): "yyyy-MM-dd HH:mm:ss"}`; `landed_files`: tập `(source_system, entity, name, size, modify_epoch_seconds)` (so theo giây vì `landed_file` lưu giây); `listings`: `{source_id: list_drop_zone(...)}`. DB: cửa sổ rỗng (watermark ≥ cận trên) ⇒ `no_data reason=up_to_date`. File: `no_data reason=settle_pending:<n>` hoặc `no_new_files`; snapshot không có ngày trong tên ⇒ `errors` |
 ### 4.11 Worker
 
 | Hàm | Chữ ký | Hành vi |
@@ -437,6 +449,9 @@ Contract quality: `run_contract_checks(deliveries, run_id)` đăng ký `read_lan
 | Hàm | Chữ ký | Hành vi |
 |---|---|---|
 | `latest_event` | `(events: DataFrame) -> DataFrame` | giữ một dòng mỗi `(source_system, order_no, product_code)` theo R-ORD-04: `updated_at_utc` giảm dần, rồi `status_rank`, `_delivered_at_utc`, `_row_no` |
+| `conform_delivery` | `(delivery, silver_spec) -> DataFrame` | `read_landing` + `conform_sql` ([§3.3](#33-conform_sql)); không lọc dòng |
+| `delivery_schema` | `(delivery) -> (added, missing, missing_required)` | `schema_drift` giữa `manifest.columns` và contract |
+| `conform_master` | `(delivery, silver_spec) -> DataFrame` | `conform_delivery` + R-MST-01 (cột `_is_dup`, mã `duplicate_key_in_snapshot` vào `_dq_flags`) + `self_manager` cho sales_hierarchy (`salesmanager_code` ⇒ NULL, tính lại `_record_hash`) |
 
 Worker Gold dùng hàm này thay cho `slv.v_orders_current`, trên các sự kiện đã lọc theo khoá bị chạm. Phải cho cùng kết quả với view (`test_current_matches_view` ở `nb_test_e2e`); đổi thứ tự sắp xếp ở một nơi thì đổi cả nơi kia.
 

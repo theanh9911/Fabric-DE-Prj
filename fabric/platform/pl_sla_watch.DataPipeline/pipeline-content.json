@@ -2,11 +2,25 @@
   "properties": {
     "activities": [
       {
+        "name": "check_sla",
         "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:20:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
         "typeProperties": {
           "notebookId": "0f5732c6-3b60-4f34-b4b5-530f8a2b5011",
           "workspaceId": "00000000-0000-0000-0000-000000000000",
           "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
             "p_load_date": {
               "value": {
                 "value": "@pipeline().parameters.p_load_date",
@@ -15,14 +29,39 @@
               "type": "string"
             }
           }
-        },
-        "policy": {
-          "timeout": "0.00:20:00",
-          "retry": 1,
-          "retryIntervalInSeconds": 60
-        },
-        "name": "check_source_sla",
-        "dependsOn": []
+        }
+      },
+      {
+        "name": "if_late",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "check_sla",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(length(json(activity('check_sla').output.result.exitValue).late_sources), 0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "alert_late",
+              "type": "Fail",
+              "dependsOn": [],
+              "typeProperties": {
+                "message": {
+                  "value": "@concat('SLA: nguồn trễ: ', string(json(activity('check_sla').output.result.exitValue).late_sources))",
+                  "type": "Expression"
+                },
+                "errorCode": "SLA_LATE_SOURCE"
+              }
+            }
+          ]
+        }
       }
     ],
     "parameters": {

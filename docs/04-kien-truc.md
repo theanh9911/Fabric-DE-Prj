@@ -651,23 +651,29 @@ Ký hiệu: `CDF(t)` = `read_changes(t, from, to)` với `from` = version đã l
 
 ```json
 {
-  "run_id": "…", "batch_id": "20260115", "load_date": "2026-01-15",
+  "run_id": "…", "batch_id": "20260115", "load_date": "2026-01-15", "load_date_to": null,
   "run_start_utc": "2026-01-16T00:05:00Z", "check_scope": "daily",
-  "ids": {"source_workspace_id": "…", "erp_item_id": "…", "drop_lakehouse_id": "…"},
+  "ids": {"source_workspace_id": "…", "erp_item_id": "…", "drop_lakehouse_id": "…",
+          "platform_workspace_id": "…", "platform_lakehouse_id": "…"},
   "sources": [
-    {"source_id": "retail.orders", "source_system": "retail", "entity": "orders",
-     "load_strategy": "file_new_or_changed", "kind": "event",
-     "delivery_id": "…", "staging_path": "Files/_staging/…",
+    {"source_id": "retail.orders", "source_system": "retail", "entity": "orders", "batch_id": "20260115",
+     "contract_version": "1.1.0", "load_strategy": "file_new_or_changed", "kind": "event",
+     "delivery_id": "…", "staging_path": "Files/_staging/…", "staging_folder": "_staging/…",
      "source_folder": "inbound/retail/orders", "file_glob": "*.csv",
-     "modified_start": "…", "modified_end": "…",
-     "expected_files": [{"name": "orders_20260115.csv", "size": 10423}]},
-    {"source_id": "wholesale.orders", "load_strategy": "db_incremental", "kind": "event",
-     "delivery_id": "…", "staging_path": "Files/_staging/…", "query": "SELECT * FROM dbo.orders WHERE …"}
+     "window_start": null, "window_end": null, "snapshot_date": null,
+     "modified_start": "2026-01-15T23:10:04Z", "modified_end": "2026-01-15T23:10:05Z",
+     "expected_files": [{"name": "orders_20260115.csv", "size": 10423, "modify_time_utc": "2026-01-15T23:10:04Z"}]},
+    {"source_id": "wholesale.orders", "source_system": "wholesale", "entity": "orders", "batch_id": "20260115",
+     "contract_version": "1.0.0", "load_strategy": "db_incremental", "kind": "event",
+     "delivery_id": "…", "staging_path": "Files/_staging/…", "staging_folder": "_staging/…",
+     "window_start": "2026-01-15 00:00:00", "window_end": "2026-01-16 00:00:00", "snapshot_date": null,
+     "query": "SELECT * FROM dbo.orders WHERE [updated_at] >= '2026-01-15 00:00:00' AND [updated_at] < '2026-01-16 00:00:00'"}
   ],
   "master_entities": ["customers", "products", "sales_hierarchy", "categories"]
 }
 ```
 
+`staging_folder` là `staging_path` bỏ tiền tố `Files/` (Copy activity chọn thư mục tương đối theo gốc `Files`). `ids.platform_*` là đích của Copy (notebook không hardcode ID). Khoảng `[modified_start, modified_end)` của file lấy từ chính danh sách file ở bước 1, nên có thể chứa cả file đã xử lý nằm giữa; `nb_land` loại chúng theo `expected_files`.
 `master_entities` = `entity` của các bảng `SILVER` có `kind: snapshot`, `is_active` và có ít nhất một contract không `retired`. `check_scope`: `full` nếu `p_load_date` rơi vào `SETTINGS.full_checks_weekday` hoặc `p_full_reload`, ngược lại `daily`.
 
 `nb_land` (nhận `p_source_json` = một phần tử của `sources`, `p_copy_rows_read`):
@@ -781,7 +787,7 @@ Pipeline là bộ điều phối: thứ tự do `dependsOn`; activity lỗi thì
 | 10 | `dq` | Notebook `nb_dq` | `gld_fct_order_line` | |
 | 11 | `recon` | Notebook `nb_recon` | `dq` | |
 | 12 | `close_ok` | Notebook `nb_close` (`p_status = SUCCEEDED`) | `recon` thành công | |
-| 13 | `close_failed`, `alert` | Notebook `nb_close` (`p_status = FAILED`, `p_error`) rồi activity cảnh báo | bất kỳ activity ở trên lỗi | |
+| 13 | `close_failed`, `fail_run`, `alert` | Notebook `nb_close` (`p_status = FAILED`; liệt kê các dòng `FAILED` của lượt trong `run_log`), rồi activity `Fail` (để Monitor hiện lượt là **Failed**, không phải Succeeded do nhánh lỗi đã xử lý), rồi activity cảnh báo (T6.1) | `close_failed` chạy khi activity cuối `recon` ở trạng thái Failed hoặc Skipped | |
 
 - Tham số của mọi Notebook activity: [§10.3](#103-hợp-đồng-worker); `p_run_id = @pipeline().RunId`.
 - Mọi activity: `retry: 0`, `timeout: 0.02:00:00`.

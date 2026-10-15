@@ -48,28 +48,28 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | T1.2 | Hoàn thiện contract và từ điển theo EDA | REVIEW | T0.3, T1.1 |
 | T2.1 | `nb_config` | REVIEW | T1.2, T0.2 |
 | T2.2 | `nb_std` | REVIEW | T0.2 |
-| T2.3 | `nb_common` | TODO | T2.1, T2.2 |
-| T2.4 | `nb_setup_ddl` | TODO | T2.1 |
-| T2.5 | `nb_test_unit` | TODO | T2.3 |
+| T2.3 | `nb_common` | REVIEW | T2.1, T2.2 |
+| T2.4 | `nb_setup_ddl` | REVIEW | T2.1 |
+| T2.5 | `nb_test_unit` | REVIEW | T2.3 |
 | T2.6 | Reset Dev | TODO | T2.4 |
-| T3.1 | `nb_plan` | TODO | T2.5, T2.6 |
-| T3.2 | `nb_land` | TODO | T3.1 |
-| T3.3 | `pl_master_daily` (khung: plan, ingest, close) + Connection | TODO | T3.2, T0.2 |
-| T3.4 | `nb_dq`, `nb_recon` (khung, contract check, RC-01) | TODO | T3.3 |
-| T4.1 | `nb_slv_orders` | TODO | T3.4 |
-| T4.2 | `nb_slv_master` | TODO | T3.4 |
-| T5.1 | `nb_gld_dim_date` | TODO | T3.4 |
-| T5.2 | `nb_gld_dim_customer` | TODO | T4.1, T4.2 |
-| T5.3 | `nb_gld_dim_product` | TODO | T4.1, T4.2 |
-| T5.4 | `nb_gld_dim_salesman` | TODO | T4.1, T4.2 |
-| T5.5 | `nb_gld_fct_order_line` | TODO | T5.1–T5.4 |
-| T6.1 | Cảnh báo lỗi + `pl_backfill` | TODO | T5.5, T0.2 |
-| T6.2 | `nb_sla_watch` + `pl_sla_watch` | TODO | T6.1 |
-| T6.3 | `nb_maintenance` + `pl_maintenance` | TODO | T5.5 |
-| T6.4 | `nb_ops_delivery` | TODO | T4.1 |
-| T7.1 | `nb_00_sim_inject` (workspace Source) | TODO | — |
+| T3.1 | `nb_plan` | REVIEW | T2.5, T2.6 |
+| T3.2 | `nb_land` | REVIEW | T3.1 |
+| T3.3 | `pl_master_daily` (khung: plan, ingest, close) + Connection | REVIEW | T3.2, T0.2 |
+| T3.4 | `nb_dq`, `nb_recon` (khung, contract check, RC-01) | REVIEW | T3.3 |
+| T4.1 | `nb_slv_orders` | REVIEW | T3.4 |
+| T4.2 | `nb_slv_master` | REVIEW | T3.4 |
+| T5.1 | `nb_gld_dim_date` | REVIEW | T3.4 |
+| T5.2 | `nb_gld_dim_customer` | REVIEW | T4.1, T4.2 |
+| T5.3 | `nb_gld_dim_product` | REVIEW | T4.1, T4.2 |
+| T5.4 | `nb_gld_dim_salesman` | REVIEW | T4.1, T4.2 |
+| T5.5 | `nb_gld_fct_order_line` | REVIEW | T5.1–T5.4 |
+| T6.1 | Cảnh báo lỗi + `pl_backfill` | REVIEW (cảnh báo Teams chờ K07; hiện dùng activity Fail) | T5.5, T0.2 |
+| T6.2 | `nb_sla_watch` + `pl_sla_watch` | REVIEW | T6.1 |
+| T6.3 | `nb_maintenance` + `pl_maintenance` | REVIEW | T5.5 |
+| T6.4 | `nb_ops_delivery` | REVIEW | T4.1 |
+| T7.1 | `nb_00_sim_inject` (workspace Source) | REVIEW | — |
 | T8.1 | Chạy toàn bộ lịch sử, đối chiếu nguồn | TODO | T6.1 |
-| T8.2 | Diễn tập sự cố + `nb_test_e2e` | TODO | T7.1, T8.1 |
+| T8.2 | Diễn tập sự cố + `nb_test_e2e` | IN_PROGRESS (`nb_test_e2e` đã viết; còn diễn tập) | T7.1, T8.1 |
 | T8.3 | 7 ngày giả lập liên tục | TODO | T8.2 |
 | T8.4 | Dọn item tạm | TODO | T8.3 |
 | T8.5 | Promote Prod | TODO | T8.4 |

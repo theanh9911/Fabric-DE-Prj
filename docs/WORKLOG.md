@@ -141,3 +141,21 @@ Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
 Tài liệu đã sửa: 05 §3.1, §3.2 (thêm `lookup_expr`, tham số `available_columns`).
 Kiểm tra local: `check_repo.py` (không có Spark/Java ở máy local nên không chạy SQL).
 Kiểm chứng Fabric: chưa kiểm chứng; `nb_test_unit` (T2.5) kiểm trên Spark.
+## 2026-10-15 — T2.3–T7.1: viết toàn bộ code v2 — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Đã làm (theo yêu cầu "triển khai end to end"; K11c bỏ qua, người dùng tự dựng):
+- `nb_common` (05 §4 đầy đủ + `run_node`, `conform_master`, `preflight`, `plan_ingest`…), `nb_setup_ddl` (sinh từ khối SQL của 04, C11 PASS), `nb_test_unit`.
+- Ingest: `nb_plan`, `nb_land`, `nb_close`; `pl_master_daily` (13 activity + `fail_run`), `nb_dq`, `nb_recon`; `CHECKS` đủ 28 check trong `nb_config`.
+- Silver: `nb_slv_orders`, `nb_slv_master`. Gold: `nb_gld_dim_date`, `dim_customer`, `dim_product`, `dim_salesman`, `fct_order_line`. Mọi object `is_active = True`.
+- Vận hành: `nb_sla_watch` + `pl_sla_watch`, `nb_maintenance` + `pl_maintenance`, `nb_ops_delivery`, `nb_backfill_dates` + `pl_backfill`.
+- Simulator: `nb_00_sim_inject` (workspace Source); `nb_test_e2e`.
+Quyết định kỹ thuật cần biết:
+- `snapshot_changes`: sửa SQL của 05 §4.9; `_seq` chỉ tính trên snapshot mới (dòng `previous` có `_seq = 0`), thêm điều kiện khoảng trống `_seq > _prev_seq + 1` ⇒ `REINSERT`. Bản cũ không phát hiện REINSERT khi dựng full.
+- `resolve_quarantine`: chỉ đóng dòng REJECT thuộc delivery khác delivery mới nhất của khoá (dòng lỗi và dòng đúng cùng delivery không tự đóng nhau).
+- `quarantine`: khoá chống trùng so sánh null-safe (`business_key` có thể NULL).
+- `_merge`: MERGE không đổi gì có thể không tạo commit ⇒ so version trước/sau, trả số 0.
+- `pl_master_daily` thêm activity `Fail` sau `close_failed` để Monitor hiện lượt Failed; `nb_close` lấy lỗi từ `run_log` thay vì biểu thức `activity().error`.
+- `plan` trả `staging_folder`, `ids.platform_*`, `modify_time_utc` của file; `landed_file` so theo giây.
+Kiểm tra local (không có Spark): `check_repo.py` OK (C01–C12); `preflight` và `plan_ingest` chạy bằng Python thuần với pyspark giả.
+Kiểm chứng Fabric: **chưa kiểm chứng** — toàn bộ notebook SQL/Spark và pipeline chưa chạy trên Fabric. Thứ tự: docs/07 §1.4.
+Chưa làm: cảnh báo Teams (K07, T6.1), Connection của Copy (người dùng gắn trong UI, ID Connection là placeholder `0000…`), T2.6 reset Dev (người chạy `nb_setup_ddl` với `p_reset`).

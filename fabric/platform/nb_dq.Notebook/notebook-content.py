@@ -6,15 +6,31 @@
 # META   "kernel_info": {
 # META     "name": "synapse_pyspark"
 # META   },
-# META   "dependencies": {}
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "79063a99-fe42-4078-8659-25c7c2894c06",
+# META       "default_lakehouse_name": "lh_platform",
+# META       "default_lakehouse_workspace_id": "02594272-f3b4-47d6-a983-347bdaefe9be",
+# META       "known_lakehouses": [
+# META         {
+# META           "id": "79063a99-fe42-4078-8659-25c7c2894c06"
+# META         }
+# META       ]
+# META     }
+# META   }
 # META }
+
+# MARKDOWN ********************
+
+# # nb_dq
+# Chạy check nền tảng (`nb_config.CHECKS`) và check contract của các delivery trong lượt; ghi `meta.check_result`.
+# Có check critical FAIL ⇒ ghi hết rồi raise (lượt FAILED). Spec: docs/04-kien-truc.md §10.9, §13.
 
 # PARAMETERS CELL ********************
 
 p_run_id = ""
 p_batch_id = ""
-p_layer = "all"
-p_entities = "ALL"
+p_check_scope = "daily"
 
 # METADATA ********************
 
@@ -25,103 +41,91 @@ p_entities = "ALL"
 
 # CELL ********************
 
+%run nb_contracts
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
 
 %run nb_config
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # CELL ********************
 
+%run nb_std
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
 
 %run nb_common
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # CELL ********************
 
-import json
+NB_NAME = "nb_dq"
+RUN_ID, BATCH_ID, SCOPE = p_run_id, p_batch_id, (p_check_scope or "daily")
+INACTIVE = {o["table"] for o in SILVER + GOLD if not o["is_active"]}
 
-run_id = p_run_id or str(uuid.uuid4())
-failures = []
-results = []
 
-def require_tables(tables):
-    missing = []
-    for table in tables:
-        if table_exists(table):
-            continue
-        check_id = f"required_table.{table}"
-        log_check(run_id, p_batch_id, check_id, "dq", table, "table_exists",
-                  1, 0, 0, "critical", fail_fast=False)
-        results.append((check_id, "FAIL"))
-        missing.append(table)
-    if missing:
-        raise RuntimeError(f"Required Gold tables are missing: {', '.join(missing)}")
+def run_all():
+    results = []  # (check_id, status, severity)
+    for spec in CHECKS:
+        if spec["check_id"].startswith("DQ-OPS-01") or spec["object"] in INACTIVE:
+            continue  # DQ-OPS-01 do nb_sla_watch chạy; object chưa bật thì chưa có gì để kiểm
+        try:
+            st = run_check(spec, RUN_ID, BATCH_ID, SCOPE)
+        except Exception as exc:  # noqa: BLE001 — check hỏng là lỗi vận hành, không được nuốt
+            log_check(RUN_ID, BATCH_ID, spec["check_id"], "platform", spec["type"], spec["object"], spec["scope"],
+                      0, None, 0, spec["severity"], message=f"check lỗi: {type(exc).__name__}: {str(exc)[:300]}",
+                      status="FAIL")
+            st = "FAIL"
+        if st is not None:
+            results.append((spec["check_id"], st, spec["severity"]))
+    deliveries = deliveries_of_run(RUN_ID, ("LANDED", "LOADED"))
+    for check_id, delivery_id, st in run_contract_checks(deliveries, RUN_ID):
+        results.append((f"{check_id}@{delivery_id[:8]}", st, "critical" if st == "FAIL" else "warning"))
+    return results
 
-def check_unique(table, keys, check_id):
-    if not table_exists(table):
-        return
-    df = spark.table(table)
-    dup = df.groupBy(*keys).count().where("count > 1")
-    n = dup.count()
-    sample = json.dumps([r.asDict() for r in dup.limit(5).collect()], default=str)
-    status = log_check(run_id, p_batch_id, check_id, "dq", table, ",".join(keys),
-                       0, n, 0, "critical", sample)
-    results.append((check_id, status))
 
-def check_not_null(table, columns, check_id):
-    if not table_exists(table):
-        return
-    df = spark.table(table)
-    condition = reduce(lambda a, b: a | b, [F.col(c).isNull() for c in columns])
-    n = df.where(condition).count()
-    status = log_check(run_id, p_batch_id, check_id, "dq", table, ",".join(columns),
-                       0, n, 0, "critical")
-    results.append((check_id, status))
+try:
+    RESULTS = run_all()
+except Exception as exc:  # noqa: BLE001
+    log_run(RUN_ID, "dq", "dq", "FAILED", error_message=f"nb_dq: {type(exc).__name__}: {str(exc)[:1500]}")
+    raise
+FAILED = [r[0] for r in RESULTS if r[1] == "FAIL"]
+WARNED = [r[0] for r in RESULTS if r[1] == "WARN"]
+log_run(RUN_ID, "dq", "dq", "FAILED" if FAILED else "SUCCEEDED", rows_in=len(RESULTS), rows_flagged=len(WARNED),
+        error_message=("critical FAIL: " + ", ".join(FAILED)) if FAILED else None)
+if FAILED:
+    raise RuntimeError("check critical FAIL: " + ", ".join(FAILED))
+exit_worker({"contract": 1, "status": "SUCCEEDED", "checks": len(RESULTS), "warnings": len(WARNED)})
 
-if p_layer in ("all", "slv"):
-    selected_sources = SOURCES
-    if p_entities != "ALL":
-        requested = {x.strip() for x in p_entities.split(",") if x.strip()}
-        selected_sources = [s for s in SOURCES
-                            if f"{s['source_system']}.{s['entity']}" in requested]
-    for source in selected_sources:
-        table = f"slv.slv_{source['source_system']}_{source['entity']}"
-        if table_exists(table):
-            check_not_null(table, ["_bk"], f"{table}.business_key_not_null")
-    if (p_entities == "ALL" or any(
-            x.strip().endswith(".orders") for x in p_entities.split(","))) and table_exists("slv.slv_orders_event"):
-        check_unique("slv.slv_orders_event", ["source_system", "_bk", "order_status", "_updated_at_utc"],
-                     "slv_orders_event.event_key_unique")
+# METADATA ********************
 
-if p_layer in ("all", "gld"):
-    require_tables([
-        "gld.gld_d_date", "gld.gld_d_customer", "gld.gld_d_product",
-        "gld.gld_d_salesman", "gld.gld_f_sales_line", "gld.gld_a_sales_month"])
-    for table, keys, required in [
-        ("gld.gld_d_date", ["date_key"], ["date_key", "date_value"]),
-        ("gld.gld_d_customer", ["customer_sk"], ["customer_sk"]),
-        ("gld.gld_d_product", ["product_sk"], ["product_sk"]),
-        ("gld.gld_d_salesman", ["salesman_sk"], ["salesman_sk"]),
-        ("gld.gld_f_sales_line", ["order_no", "product_code"], ["order_no", "product_code", "date_key"]),
-        ("gld.gld_a_sales_month", ["month_key", "product_sk", "customer_sk", "salesman_sk"], ["month_key"]),
-    ]:
-        check_unique(table, keys, f"{table}.unique")
-        check_not_null(table, required, f"{table}.not_null")
-    if table_exists("gld.gld_d_salesman"):
-        overlap = spark.sql("""
-          SELECT count(*) AS n FROM (
-            SELECT source_system, salesman_code,
-                   count_if(is_current) AS current_count
-            FROM gld.gld_d_salesman GROUP BY source_system, salesman_code
-            HAVING current_count <> 1
-          ) x
-        """).first()["n"]
-        status = log_check(run_id, p_batch_id, "gld_d_salesman.one_current", "dq",
-                           "gld.gld_d_salesman", "source_system,salesman_code", 0, overlap)
-        results.append(("gld_d_salesman.one_current", status))
-
-if table_exists("slv.quarantine"):
-    open_count = spark.table("slv.quarantine").count()
-    results.append(("slv.quarantine.open_count", open_count))
-
-notebookutils.notebook.exit(json.dumps({"run_id": run_id, "checks": results,
-                                        "quarantine_rows": open_count if table_exists("slv.quarantine") else 0,
-                                        "checked_layer": p_layer,
-                                        "entities": p_entities}))
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }

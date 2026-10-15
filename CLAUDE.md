@@ -6,7 +6,7 @@ Dành cho AI agent và kỹ sư làm việc trên repo này. Thiết kế, task 
 
 Sales Data Platform trên Microsoft Fabric, mô phỏng dự án thật. Nguồn: ERP bán buôn (Fabric SQL Database) và file CSV bán lẻ (drop zone OneLake), do simulator ở workspace `CompanyA-Source` sinh ra. Platform đi qua ba tầng **Landing → Silver → Gold**, với schema `meta` cho vận hành. Contract nguồn ở `contracts/` (ODCS YAML).
 
-Trạng thái: tài liệu đã xong (v2); code trong `fabric/platform/` vẫn là v1 cũ, sẽ được viết lại theo [docs/06-tasks.md](docs/06-tasks.md).
+Trạng thái: tài liệu và code v2 đã viết xong trong `fabric/platform/` (mọi task ở `REVIEW`, chờ kiểm chứng trên Fabric); tiến độ ở [docs/06-tasks.md](docs/06-tasks.md).
 
 ## 2. Đọc gì trước khi làm
 

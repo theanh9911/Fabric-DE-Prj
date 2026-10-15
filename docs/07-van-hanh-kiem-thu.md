@@ -23,6 +23,21 @@ Identity chạy pipeline cần: quyền dùng hai Connection tới `sqldb_erp_wh
 9. Chạy thử `pl_master_daily` một lượt; kiểm Q01, Q17.
 10. Đặt lịch ([04 §15](04-kien-truc.md#15-pipeline-lịch-cảnh-báo-bảo-trì)) — chỉ Prod.
 
+### 1.4 Chạy kiểm chứng lần đầu (Dev)
+
+Làm theo thứ tự; dừng ở bước đầu tiên không đạt và dán lỗi vào WORKLOG ([§6.3](#63-báo-kết-quả-kiểm-chứng)).
+
+| # | Việc | Kỳ vọng |
+|---|---|---|
+| 1 | Workspace Dev: **Update all** từ `dev`; gắn `lh_platform` làm default cho từng notebook (nếu Git chưa giữ binding) | không còn lỗi sync |
+| 2 | Chạy `nb_config` | in `Validated 9 contracts, 5 silver, 5 gold, 28 checks` |
+| 3 | Chạy `nb_setup_ddl` (`p_reset = False`), hai lần | lần hai không lỗi; in `nb_setup_ddl OK` |
+| 4 | Chạy `nb_test_unit` | mọi test PASS |
+| 5 | Tạo Connection (SQL Database nguồn, Lakehouse drop zone, Lakehouse platform) và chọn trong từng Copy activity của `pl_master_daily` (trong `if_db`) | Validate không lỗi |
+| 6 | Chạy `nb_plan` trực tiếp (`p_load_date` = ngày simulator đầu) | `sources` đủ 9 source |
+| 7 | Chạy `pl_master_daily` với `p_load_date` = ngày simulator | Q01, Q03, Q17: mọi activity Succeeded |
+| 8 | Chạy lại cùng tham số | source file `NO_DATA`, DB snapshot `UNCHANGED`, node `SKIPPED up_to_date` |
+| 9 | Chạy `nb_test_e2e` | không FAIL (kịch bản chưa tiêm là SKIP) |
 ### 1.2 Reset Dev
 
 Chỉ ở Dev. Đưa platform về trống để chạy lại từ đầu. Bước 2 và 5 (dựng lại nguồn) chỉ làm khi cần dữ liệu nguồn mới; khi nguồn đã sẵn sàng thì bỏ qua.
@@ -61,6 +76,8 @@ Chỉ ở Dev. Đưa platform về trống để chạy lại từ đầu. Bư�
 | `nb_maintenance` | Notebook | `pl_maintenance` |
 | `nb_test_unit`, `nb_test_e2e` | Notebook test | người |
 | `nb_ops_delivery` | Notebook thao tác (park/release delivery) | người |
+| 
+b_backfill_dates | Notebook (sinh danh sách ngày cho pl_backfill) | pl_backfill |
 | `pl_master_daily`, `pl_backfill`, `pl_sla_watch`, `pl_maintenance` | Data pipeline | lịch / người |
 
 Workspace Source: `lh_sim`, `lh_retail_drop`, `sqldb_erp_wholesale`, `nb_00_sim_common`, `nb_00_sim_setup`, `nb_00_sim_daily`, `nb_00_sim_reset`, `nb_00_sim_inject`.

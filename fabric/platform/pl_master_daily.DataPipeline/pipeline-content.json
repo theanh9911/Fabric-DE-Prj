@@ -1,0 +1,1001 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "plan",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "7f6af02d-1cca-428f-a757-23ec22df345a",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_load_date": {
+              "value": {
+                "value": "@pipeline().parameters.p_load_date",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_load_date_to": {
+              "value": {
+                "value": "@pipeline().parameters.p_load_date_to",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_mode": {
+              "value": {
+                "value": "@pipeline().parameters.p_mode",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_source_workspace": {
+              "value": {
+                "value": "@pipeline().parameters.p_source_workspace",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_erp_item": {
+              "value": {
+                "value": "@pipeline().parameters.p_erp_item",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_drop_lakehouse": {
+              "value": {
+                "value": "@pipeline().parameters.p_drop_lakehouse",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "for_each_source",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "plan",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@json(activity('plan').output.result.exitValue).sources",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "if_db",
+              "type": "IfCondition",
+              "dependsOn": [],
+              "typeProperties": {
+                "expression": {
+                  "value": "@startsWith(item().load_strategy, 'db_')",
+                  "type": "Expression"
+                },
+                "ifTrueActivities": [
+                  {
+                    "name": "copy_db",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.02:00:00",
+                      "retry": 0,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "FabricSqlDatabaseSource",
+                        "sqlReaderQuery": {
+                          "value": "@item().query",
+                          "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None",
+                        "datasetSettings": {
+                          "annotations": [],
+                          "connectionSettings": {
+                            "name": "sqldb_erp_wholesale",
+                            "properties": {
+                              "annotations": [],
+                              "type": "FabricSqlDatabase",
+                              "typeProperties": {
+                                "workspaceId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.source_workspace_id",
+                                  "type": "Expression"
+                                },
+                                "artifactId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.erp_item_id",
+                                  "type": "Expression"
+                                }
+                              },
+                              "externalReferences": {
+                                "connection": "00000000-0000-0000-0000-000000000000"
+                              }
+                            }
+                          },
+                          "type": "FabricSqlDatabaseTable",
+                          "schema": []
+                        }
+                      },
+                      "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                          "type": "LakehouseWriteSettings"
+                        },
+                        "formatSettings": {
+                          "type": "ParquetWriteSettings",
+                          "enableVertiParquet": true
+                        },
+                        "datasetSettings": {
+                          "annotations": [],
+                          "connectionSettings": {
+                            "name": "lh_platform",
+                            "properties": {
+                              "annotations": [],
+                              "type": "Lakehouse",
+                              "typeProperties": {
+                                "workspaceId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.platform_workspace_id",
+                                  "type": "Expression"
+                                },
+                                "artifactId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.platform_lakehouse_id",
+                                  "type": "Expression"
+                                },
+                                "rootFolder": "Files"
+                              },
+                              "externalReferences": {
+                                "connection": "00000000-0000-0000-0000-000000000000"
+                              }
+                            }
+                          },
+                          "type": "Parquet",
+                          "typeProperties": {
+                            "location": {
+                              "type": "LakehouseLocation",
+                              "folderPath": {
+                                "value": "@item().staging_folder",
+                                "type": "Expression"
+                              }
+                            },
+                            "compressionCodec": "snappy"
+                          },
+                          "schema": []
+                        }
+                      },
+                      "enableStaging": false
+                    }
+                  },
+                  {
+                    "name": "land_db",
+                    "type": "TridentNotebook",
+                    "dependsOn": [
+                      {
+                        "activity": "copy_db",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "timeout": "0.02:00:00",
+                      "retry": 0,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "notebookId": "e6ca58a2-792a-4e25-98b5-1a920d3fea87",
+                      "workspaceId": "00000000-0000-0000-0000-000000000000",
+                      "parameters": {
+                        "p_run_id": {
+                          "value": {
+                            "value": "@pipeline().RunId",
+                            "type": "Expression"
+                          },
+                          "type": "string"
+                        },
+                        "p_source_json": {
+                          "value": {
+                            "value": "@string(item())",
+                            "type": "Expression"
+                          },
+                          "type": "string"
+                        },
+                        "p_copy_rows_read": {
+                          "value": {
+                            "value": "@string(activity('copy_db').output.rowsRead)",
+                            "type": "Expression"
+                          },
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "ifFalseActivities": [
+                  {
+                    "name": "copy_file",
+                    "type": "Copy",
+                    "dependsOn": [],
+                    "policy": {
+                      "timeout": "0.02:00:00",
+                      "retry": 0,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "source": {
+                        "type": "BinarySource",
+                        "storeSettings": {
+                          "type": "LakehouseReadSettings",
+                          "recursive": false,
+                          "wildcardFolderPath": {
+                            "value": "@item().source_folder",
+                            "type": "Expression"
+                          },
+                          "wildcardFileName": {
+                            "value": "@item().file_glob",
+                            "type": "Expression"
+                          },
+                          "modifiedDatetimeStart": {
+                            "value": "@item().modified_start",
+                            "type": "Expression"
+                          },
+                          "modifiedDatetimeEnd": {
+                            "value": "@item().modified_end",
+                            "type": "Expression"
+                          },
+                          "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                          "type": "BinaryReadSettings"
+                        },
+                        "datasetSettings": {
+                          "annotations": [],
+                          "connectionSettings": {
+                            "name": "lh_retail_drop",
+                            "properties": {
+                              "annotations": [],
+                              "type": "Lakehouse",
+                              "typeProperties": {
+                                "workspaceId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.source_workspace_id",
+                                  "type": "Expression"
+                                },
+                                "artifactId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.drop_lakehouse_id",
+                                  "type": "Expression"
+                                },
+                                "rootFolder": "Files"
+                              },
+                              "externalReferences": {
+                                "connection": "00000000-0000-0000-0000-000000000000"
+                              }
+                            }
+                          },
+                          "type": "Binary",
+                          "typeProperties": {
+                            "location": {
+                              "type": "LakehouseLocation"
+                            }
+                          }
+                        }
+                      },
+                      "sink": {
+                        "type": "BinarySink",
+                        "storeSettings": {
+                          "type": "LakehouseWriteSettings",
+                          "copyBehavior": "PreserveHierarchy"
+                        },
+                        "datasetSettings": {
+                          "annotations": [],
+                          "connectionSettings": {
+                            "name": "lh_platform",
+                            "properties": {
+                              "annotations": [],
+                              "type": "Lakehouse",
+                              "typeProperties": {
+                                "workspaceId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.platform_workspace_id",
+                                  "type": "Expression"
+                                },
+                                "artifactId": {
+                                  "value": "@json(activity('plan').output.result.exitValue).ids.platform_lakehouse_id",
+                                  "type": "Expression"
+                                },
+                                "rootFolder": "Files"
+                              },
+                              "externalReferences": {
+                                "connection": "00000000-0000-0000-0000-000000000000"
+                              }
+                            }
+                          },
+                          "type": "Binary",
+                          "typeProperties": {
+                            "location": {
+                              "type": "LakehouseLocation",
+                              "folderPath": {
+                                "value": "@item().staging_folder",
+                                "type": "Expression"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "enableStaging": false
+                    }
+                  },
+                  {
+                    "name": "land_file",
+                    "type": "TridentNotebook",
+                    "dependsOn": [
+                      {
+                        "activity": "copy_file",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "timeout": "0.02:00:00",
+                      "retry": 0,
+                      "retryIntervalInSeconds": 30
+                    },
+                    "typeProperties": {
+                      "notebookId": "e6ca58a2-792a-4e25-98b5-1a920d3fea87",
+                      "workspaceId": "00000000-0000-0000-0000-000000000000",
+                      "parameters": {
+                        "p_run_id": {
+                          "value": {
+                            "value": "@pipeline().RunId",
+                            "type": "Expression"
+                          },
+                          "type": "string"
+                        },
+                        "p_source_json": {
+                          "value": {
+                            "value": "@string(item())",
+                            "type": "Expression"
+                          },
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "silver_orders",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "for_each_source",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "7a6791ae-12ac-4467-b34b-cb93147ed295",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_load_date": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date, '')",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_load_date_to": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date_to, '')",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_mode": {
+              "value": {
+                "value": "@pipeline().parameters.p_mode",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            }
+          }
+        }
+      },
+      {
+        "name": "for_each_master",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "silver_orders",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@json(activity('plan').output.result.exitValue).master_entities",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "silver_master",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.02:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30
+              },
+              "typeProperties": {
+                "notebookId": "3a176fef-9176-49fe-b7bf-b26eb6ed259e",
+                "workspaceId": "00000000-0000-0000-0000-000000000000",
+                "parameters": {
+                  "p_run_id": {
+                    "value": {
+                      "value": "@pipeline().RunId",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_load_date": {
+                    "value": {
+                      "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date, '')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_load_date_to": {
+                    "value": {
+                      "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date_to, '')",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_mode": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_mode",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_scope": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_scope",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "p_full_reload": {
+                    "value": {
+                      "value": "@pipeline().parameters.p_full_reload",
+                      "type": "Expression"
+                    },
+                    "type": "bool"
+                  },
+                  "p_entity": {
+                    "value": {
+                      "value": "@item()",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "gld_dim_date",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "for_each_master",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "fdb3363a-93d2-4b9c-9de1-2aa475a7d4b8",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "gld_dim_customer",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "gld_dim_date",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "8d3dc8ea-0b54-4073-9d37-1ab904caf39e",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "gld_dim_product",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "gld_dim_customer",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "44444b8b-11ad-4fed-ac5e-c0d8cd99abfe",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "gld_dim_salesman",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "gld_dim_product",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "1d50f902-6c6e-404c-8f84-6a85b800a4ad",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "gld_fct_order_line",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "gld_dim_salesman",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "71de9f08-4f51-4855-9fb8-0290af3a3370",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_full_reload": {
+              "value": {
+                "value": "@pipeline().parameters.p_full_reload",
+                "type": "Expression"
+              },
+              "type": "bool"
+            },
+            "p_scope": {
+              "value": {
+                "value": "@pipeline().parameters.p_scope",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "dq",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "gld_fct_order_line",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "d0406a77-1715-495c-a34e-052bf004d005",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_batch_id": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).batch_id, '')",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_check_scope": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).check_scope, 'daily')",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "recon",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "dq",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "d2b5fc07-6db6-4a53-95a9-860d6466608f",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_batch_id": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).batch_id, '')",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_check_scope": {
+              "value": {
+                "value": "@coalesce(@json(activity('plan').output.result.exitValue).check_scope, 'daily')",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "close_ok",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "recon",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "c4504465-798a-4f4d-928f-8696f8dc9f77",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_status": {
+              "value": {
+                "value": "SUCCEEDED",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "close_failed",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "recon",
+            "dependencyConditions": [
+              "Failed",
+              "Skipped"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:30:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebookId": "c4504465-798a-4f4d-928f-8696f8dc9f77",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "p_run_id": {
+              "value": {
+                "value": "@pipeline().RunId",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_status": {
+              "value": {
+                "value": "FAILED",
+                "type": "Expression"
+              },
+              "type": "string"
+            },
+            "p_error": {
+              "value": {
+                "value": "@concat('pipeline failed, RunId=', pipeline().RunId)",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "fail_run",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "close_failed",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('pl_master_daily FAILED, RunId=', pipeline().RunId, '. Xem meta.v_run_latest và Monitor.')",
+            "type": "Expression"
+          },
+          "errorCode": "PLATFORM_RUN_FAILED"
+        }
+      }
+    ],
+    "parameters": {
+      "p_load_date": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "p_load_date_to": {
+        "type": "String",
+        "defaultValue": ""
+      },
+      "p_mode": {
+        "type": "String",
+        "defaultValue": "normal"
+      },
+      "p_scope": {
+        "type": "String",
+        "defaultValue": "ALL"
+      },
+      "p_full_reload": {
+        "type": "Bool",
+        "defaultValue": false
+      },
+      "p_source_workspace": {
+        "type": "String",
+        "defaultValue": "CompanyA-Source"
+      },
+      "p_erp_item": {
+        "type": "String",
+        "defaultValue": "sqldb_erp_wholesale"
+      },
+      "p_drop_lakehouse": {
+        "type": "String",
+        "defaultValue": "lh_retail_drop"
+      }
+    },
+    "concurrency": 1
+  }
+}
