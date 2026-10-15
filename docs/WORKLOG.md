@@ -116,3 +116,6 @@ Còn lại của T0.2: K11c (ID động), K11e (0 file), K06, K07, K12.
 ## 2026-10-15 — T0.2 K12 — IN_PROGRESS
 Kết quả: K12 PASS (nhánh Failed + Skipped ở cuối chuỗi bắt được lỗi; `error.message` chứa `errorValue` của notebook). Chi tiết DECISIONS §3.
 Còn lại của T0.2: K11c (ID động cho Connection), K11e (0 file), K06 (concurrency), K07 (Teams).
+## 2026-10-15 — T0.2 K11e — IN_PROGRESS
+Kết quả: khoảng last modified không khớp file ⇒ Copy Succeeded, `filesRead = 0`, `filesWritten = 0`.
+Còn lại của T0.2: K11c (ID động), K11e phần "thư mục đích có được tạo không", K06, K07.
