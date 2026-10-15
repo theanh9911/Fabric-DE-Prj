@@ -1,0 +1,87 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: retail.customers
+version: 1.0.0
+status: draft
+description:
+  purpose: Customer master of the retail channel, delivered as a full snapshot file whenever it changes.
+  limitations: >
+    All values are text with mixed date formats and local time. A key missing from a newer
+    snapshot means the customer was removed at the source. The same customer_code may exist in
+    wholesale with different attributes. Column names are to be confirmed (EDA E01).
+  usage: Read-only. File customers_YYYYMMDD.csv, full snapshot, only on change.
+schema:
+  - name: customers
+    physicalName: inbound/retail/customers
+    physicalType: file
+    logicalType: object
+    description: One row = one customer. CSV, UTF-8, comma, RFC 4180, header row.
+    properties:
+      - name: customer_code
+        logicalType: string
+        physicalType: string
+        required: true
+        primaryKey: true
+        description: Business key.
+      - name: customer_name
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Display name.
+      - name: country
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Country.
+      - name: city
+        logicalType: string
+        physicalType: string
+        required: false
+        description: City.
+      - name: gender
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Gender, many spellings.
+      - name: address
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Postal address.
+      - name: created_at
+        logicalType: timestamp
+        physicalType: string
+        required: false
+        description: Creation time, local time.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: string
+        required: false
+        description: Last change time, local time.
+team:
+  - username: retail-team
+    role: owner
+support:
+  - channel: retail-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: file_new_or_changed
+  - property: kind
+    value: snapshot
+  - property: fileGlob
+    value: "*.csv"
+  - property: settleMinutes
+    value: 5
+  - property: sourceTimezone
+    value: Asia/Ho_Chi_Minh
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+  - property: deliveryCadence
+    value: on_change
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.customers_history

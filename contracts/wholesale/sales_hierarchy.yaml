@@ -1,0 +1,92 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: wholesale.sales_hierarchy
+version: 1.0.0
+status: draft
+description:
+  purpose: Current sales organisation of the wholesale ERP (salesman and direct manager).
+  limitations: >
+    Updated in place; when a salesman changes manager the old row is overwritten, so history
+    exists only in the platform. salesmanager_code is a self-reference (NOCHECK); some rows point
+    to themselves. salesmanager_name is denormalised and can disagree with the manager's own row.
+    Position has case variants.
+  usage: Read-only. Full snapshot extraction; history is built from daily snapshots.
+schema:
+  - name: sales_hierarchy
+    physicalName: dbo.sales_hierarchy
+    physicalType: table
+    logicalType: object
+    description: One row = one salesman, current state.
+    properties:
+      - name: salesman_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: true
+        primaryKey: true
+        description: Business key; referenced by orders.
+      - name: salesman_name
+        logicalType: string
+        physicalType: nvarchar(200)
+        required: false
+        description: Salesman name.
+      - name: division
+        logicalType: string
+        physicalType: nvarchar(100)
+        required: false
+        description: Sales division.
+      - name: salesmanager_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Direct manager, references salesman_code of this table.
+      - name: salesmanager_name
+        logicalType: string
+        physicalType: nvarchar(200)
+        required: false
+        description: Manager name copied by the ERP; not authoritative.
+      - name: position
+        logicalType: string
+        physicalType: nvarchar(50)
+        required: false
+        description: Job title, case variants.
+      - name: inserted_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Creation time in the ERP clock.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Last change time in the ERP clock; may be NULL.
+    quality:
+      - type: sql
+        description: A salesman must not be his own manager.
+        query: SELECT COUNT(*) FROM ${object} WHERE upper(trim(salesmanager_code)) = upper(trim(salesman_code))
+        mustBe: 0
+        severity: warning
+team:
+  - username: erp-team
+    role: owner
+support:
+  - channel: erp-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: db_full_snapshot
+  - property: kind
+    value: snapshot
+  - property: sourceTimezone
+    value: UTC
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss"]
+  - property: deliveryCadence
+    value: daily
+  - property: availableByLocalTime
+    value: "06:00"
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.sales_hierarchy_history

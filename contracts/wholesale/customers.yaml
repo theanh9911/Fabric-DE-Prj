@@ -1,0 +1,85 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: wholesale.customers
+version: 1.0.0
+status: draft
+description:
+  purpose: Current customer master of the wholesale ERP.
+  limitations: >
+    Updated in place; the ERP keeps no history. updated_at can be NULL and is not a reliable
+    watermark, so the platform takes a full snapshot. Gender and country are written in
+    inconsistent ways. The same customer_code can exist in the retail channel with different attributes.
+  usage: Read-only. Full snapshot extraction.
+schema:
+  - name: customers
+    physicalName: dbo.customers
+    physicalType: table
+    logicalType: object
+    description: One row = one customer, current state.
+    properties:
+      - name: customer_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: true
+        primaryKey: true
+        description: Business key; referenced by orders.
+      - name: customer_name
+        logicalType: string
+        physicalType: nvarchar(200)
+        required: false
+        description: Display name.
+      - name: country
+        logicalType: string
+        physicalType: nvarchar(100)
+        required: false
+        description: Country, inconsistent spelling.
+      - name: city
+        logicalType: string
+        physicalType: nvarchar(100)
+        required: false
+        description: City, inconsistent spelling.
+      - name: gender
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Gender, many spellings.
+      - name: address
+        logicalType: string
+        physicalType: nvarchar(400)
+        required: false
+        description: Postal address.
+      - name: created_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Creation time in the ERP clock.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Last change time in the ERP clock; may be NULL.
+team:
+  - username: erp-team
+    role: owner
+support:
+  - channel: erp-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: db_full_snapshot
+  - property: kind
+    value: snapshot
+  - property: sourceTimezone
+    value: UTC
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss"]
+  - property: deliveryCadence
+    value: daily
+  - property: availableByLocalTime
+    value: "06:00"
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.customers_history

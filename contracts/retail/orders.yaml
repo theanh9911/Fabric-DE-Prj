@@ -1,0 +1,126 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: retail.orders
+version: 1.0.0
+status: draft
+description:
+  purpose: >
+    Order line status events from the retail channel, delivered as CSV files in the shared drop
+    zone. Same meaning and grain as wholesale.orders (without order_line_id).
+  limitations: >
+    All values are text. Dates and timestamps use several formats (3/15/2025 9:30, 25/3/2025,
+    2025-03-15) and carry no time zone (local Vietnam time). Numbers may be text, "NULL" appears
+    as a literal string, values may have extra spaces. A file may be re-sent with the same name
+    and corrected content. Column names are to be confirmed (EDA E01).
+  usage: >
+    Read-only. First delivery is one history file orders_history_until_YYYYMMDD.csv, then one
+    file per business day orders_YYYYMMDD.csv with new or changed events only.
+schema:
+  - name: orders
+    physicalName: inbound/retail/orders
+    physicalType: file
+    logicalType: object
+    description: One row = one status event of one product line of one order. CSV, UTF-8, comma, RFC 4180, header row.
+    properties:
+      - name: order_no
+        logicalType: string
+        physicalType: string
+        required: true
+        description: Business order number.
+      - name: customer_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Buying customer.
+      - name: order_date
+        logicalType: date
+        physicalType: string
+        required: false
+        description: Business transaction date, several formats.
+      - name: order_status
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Pending, Confirmed, Shipped, Delivered, Cancelled (free text).
+      - name: product_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Ordered product.
+      - name: salesman_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Responsible salesman.
+      - name: quantity
+        logicalType: number
+        physicalType: string
+        required: false
+        description: Ordered quantity as text.
+      - name: price
+        logicalType: number
+        physicalType: string
+        required: false
+        description: Unit price as text.
+      - name: tax_rate
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Tax rate as text.
+      - name: created_at
+        logicalType: timestamp
+        physicalType: string
+        required: false
+        description: Creation time, local time, several formats.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: string
+        required: true
+        description: Change time, local time, several formats.
+    quality:
+      - type: sql
+        description: order_status must be one of the agreed values.
+        query: >
+          SELECT COUNT(*) FROM ${object}
+          WHERE order_status IS NOT NULL
+            AND trim(order_status) NOT IN ('Pending','Confirmed','Shipped','Delivered','Cancelled')
+        mustBe: 0
+        severity: warning
+      - type: sql
+        description: quantity must be a positive number.
+        query: >
+          SELECT COUNT(*) FROM ${object}
+          WHERE try_cast(quantity AS DECIMAL(18,2)) IS NULL OR try_cast(quantity AS DECIMAL(18,2)) <= 0
+        mustBe: 0
+        severity: warning
+team:
+  - username: retail-team
+    role: owner
+support:
+  - channel: retail-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: file_new_or_changed
+  - property: kind
+    value: event
+  - property: fileGlob
+    value: "*.csv"
+  - property: settleMinutes
+    value: 5
+  - property: sourceTimezone
+    value: Asia/Ho_Chi_Minh
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+  - property: dateFormats
+    value: ["yyyy-MM-dd", "yyyy/MM/dd", "M/d/yyyy", "d/M/yyyy"]
+  - property: deliveryCadence
+    value: daily
+  - property: availableByLocalTime
+    value: "06:00"
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.orders_event

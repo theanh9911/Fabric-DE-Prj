@@ -1,0 +1,141 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: wholesale.orders
+version: 1.0.0
+status: draft
+description:
+  purpose: >
+    Order line status events from the wholesale ERP. A new row is inserted every time an order
+    line changes status; earlier rows are never updated. Used to build order line history and
+    order line facts.
+  limitations: >
+    Free-text order_status with typos; quantity may be negative or fractional; tax_rate is text
+    ("5%", "five percent"); foreign keys are declared NOCHECK so orphan customer/product/salesman
+    codes exist; some order_date values are in the future (data entry errors).
+  usage: Read-only for the data platform. Incremental extraction by updated_at.
+schema:
+  - name: orders
+    physicalName: dbo.orders
+    physicalType: table
+    logicalType: object
+    description: One row = one status event of one product line of one order.
+    properties:
+      - name: order_line_id
+        logicalType: integer
+        physicalType: bigint
+        required: true
+        primaryKey: true
+        description: ERP identity column. Technical key of the source database only; not a business key.
+      - name: order_no
+        logicalType: string
+        physicalType: nvarchar(30)
+        required: true
+        description: Business order number. One order has many product lines.
+      - name: customer_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Buying customer. May reference a code missing from customers (orphan).
+      - name: order_date
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Business transaction date of the order.
+      - name: order_status
+        logicalType: string
+        physicalType: nvarchar(30)
+        required: false
+        description: Pending, Confirmed, Shipped, Delivered, Cancelled (free text, may contain typos).
+      - name: product_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Ordered product. May reference a code missing from products (orphan).
+      - name: salesman_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Responsible salesman.
+      - name: quantity
+        logicalType: number
+        physicalType: decimal(18,2)
+        required: false
+        description: Ordered quantity.
+      - name: price
+        logicalType: number
+        physicalType: decimal(18,2)
+        required: false
+        description: Unit price.
+      - name: tax_rate
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Tax rate as text, e.g. "5%", "0.05", "five percent".
+      - name: created_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Row creation time in the ERP clock.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: true
+        description: Row change time in the ERP clock. Indexed; watermark column.
+    quality:
+      - type: sql
+        description: order_status must be one of the agreed values.
+        query: >
+          SELECT COUNT(*) FROM ${object}
+          WHERE order_status IS NOT NULL
+            AND trim(order_status) NOT IN ('Pending','Confirmed','Shipped','Delivered','Cancelled')
+        mustBe: 0
+        severity: warning
+      - type: sql
+        description: quantity must be a positive number.
+        query: >
+          SELECT COUNT(*) FROM ${object}
+          WHERE try_cast(quantity AS DECIMAL(18,2)) IS NULL OR try_cast(quantity AS DECIMAL(18,2)) <= 0
+        mustBe: 0
+        severity: warning
+      - type: sql
+        description: price must be a non-negative number.
+        query: >
+          SELECT COUNT(*) FROM ${object}
+          WHERE try_cast(price AS DECIMAL(18,2)) IS NULL OR try_cast(price AS DECIMAL(18,2)) < 0
+        mustBe: 0
+        severity: warning
+team:
+  - username: erp-team
+    role: owner
+support:
+  - channel: erp-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: db_incremental
+  - property: kind
+    value: event
+  - property: watermarkColumn
+    value: updated_at
+  - property: sourceClock
+    value: virtual
+  - property: commitLagMinutes
+    value: 0
+  - property: lookbackMinutes
+    value: 0
+  - property: sourceTimezone
+    value: UTC
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss"]
+  - property: dateFormats
+    value: ["yyyy-MM-dd"]
+  - property: deliveryCadence
+    value: daily
+  - property: availableByLocalTime
+    value: "06:00"
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.orders_event

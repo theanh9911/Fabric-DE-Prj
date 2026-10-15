@@ -1,0 +1,74 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: wholesale.products
+version: 1.0.0
+status: draft
+description:
+  purpose: Current product master of the wholesale ERP.
+  limitations: >
+    Updated in place; no history. Brand has several spellings for the same brand. category_code
+    references the shared categories file; CAT010 and CAT999 do not exist there.
+  usage: Read-only. Full snapshot extraction.
+schema:
+  - name: products
+    physicalName: dbo.products
+    physicalType: table
+    logicalType: object
+    description: One row = one product, current state.
+    properties:
+      - name: product_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: true
+        primaryKey: true
+        description: Business key; referenced by orders.
+      - name: product_name
+        logicalType: string
+        physicalType: nvarchar(200)
+        required: false
+        description: Product name.
+      - name: brand
+        logicalType: string
+        physicalType: nvarchar(100)
+        required: false
+        description: Brand, inconsistent spelling.
+      - name: category_code
+        logicalType: string
+        physicalType: nvarchar(20)
+        required: false
+        description: Category, references reference.categories.
+      - name: created_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Creation time in the ERP clock.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: datetime2(0)
+        required: false
+        description: Last change time in the ERP clock; may be NULL.
+team:
+  - username: erp-team
+    role: owner
+support:
+  - channel: erp-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: db_full_snapshot
+  - property: kind
+    value: snapshot
+  - property: sourceTimezone
+    value: UTC
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss"]
+  - property: deliveryCadence
+    value: daily
+  - property: availableByLocalTime
+    value: "06:00"
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.products_history

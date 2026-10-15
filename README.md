@@ -1,36 +1,31 @@
 # Fabric-DE-Prj — Company A Sales Data Platform
 
-Mô phỏng dự án Data Engineering trên Microsoft Fabric theo hướng production. Kiến trúc hiện hành ở [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Landing là raw bất biến duy nhất, không có bảng Bronze; dữ liệu đi qua Silver, Gold, DQ/đối soát và semantic/report.
-
-**Trạng thái:** Source simulator đã có; platform code đang được dựng theo architecture mới. Xem [docs/platform-implementation.md](docs/platform-implementation.md) để biết item, thứ tự deploy và các phần còn cần bind trong Fabric.
-
-## Kiến trúc
+Mô phỏng một dự án Data Engineering trên Microsoft Fabric theo cách làm production: nguồn ERP và file bán lẻ do simulator sinh, platform ba tầng Landing → Silver → Gold, contract nguồn theo ODCS, kiểm tra chất lượng và đối soát ở mọi lượt chạy.
 
 ```text
-CompanyA-Source (chỉ đọc)                    CompanyA-DataPlatform-<Dev|Prod>
-  ERP SQL Database ─┐                         lh_platform
-  Drop zone ─────────┼─ ingest ─────────────▶   Files/landing (raw bất biến + manifest)
-  Simulator ─────────┘                           slv → gld → meta audit/checks
-                                                Direct Lake semantic model + reports
+CompanyA-Source (chỉ đọc)                 CompanyA-DataPlatform-<Dev|Prod> / lh_platform
+  sqldb_erp_wholesale ─┐                    Files/landing   raw bất biến + manifest
+  lh_retail_drop ──────┼── Copy ───────▶    slv             conform, lịch sử, quarantine
+  simulator (lh_sim) ──┘                    gld             dimension + fact
+                                            meta            nhật ký, trạng thái, check
 ```
 
-## Tài liệu
+## Bắt đầu
 
-| Đọc | Để |
-|---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Nguồn sự thật về kiến trúc và quy tắc triển khai |
-| [docs/platform-implementation.md](docs/platform-implementation.md) | Item hiện có, cách deploy, giới hạn cần xác minh trên Fabric |
-| [docs/PLAN.md](docs/PLAN.md) | Kế hoạch bản trước; đang được đồng bộ dần |
-| [docs/design/](docs/design/README.md) | Thiết kế chi tiết cũ; đối chiếu với architecture mới |
-| [docs/guide/](docs/guide/README.md) | Hướng dẫn thao tác đang chuyển từ Bronze sang Landing → Silver |
+- Luật và cách làm việc: [CLAUDE.md](CLAUDE.md)
+- Tổng quan kiến trúc: [docs/00-tong-quan.md](docs/00-tong-quan.md)
+- Tài liệu: [docs/README.md](docs/README.md)
+- Việc cần làm: [docs/06-tasks.md](docs/06-tasks.md)
 
 ## Cấu trúc repo
 
 | Thư mục | Nội dung |
 |---|---|
-| `fabric/source/` | Workspace nguồn mô phỏng: SQL project, drop zone, lakehouse và simulator notebooks |
-| `fabric/platform/` | Lakehouse, notebooks và pipelines của data platform |
-| `docs/` | Architecture, kế hoạch, source contract và hướng dẫn vận hành |
+| `contracts/` | contract dữ liệu nguồn (ODCS YAML) — nguồn sự thật về dữ liệu nguồn |
+| `fabric/source/` | workspace nguồn: SQL project ERP, Lakehouse, simulator |
+| `fabric/platform/` | workspace platform: Lakehouse, notebook, pipeline |
+| `docs/` | thiết kế, task, vận hành |
+| `tools/` | công cụ local (`uv run tools/…`) |
 
 ## Workspace
 

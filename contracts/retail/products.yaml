@@ -1,0 +1,76 @@
+apiVersion: v3.0.2
+kind: DataContract
+id: retail.products
+version: 1.0.0
+status: draft
+description:
+  purpose: Product master of the retail channel, delivered as a full snapshot file whenever it changes.
+  limitations: >
+    All values are text. A key missing from a newer snapshot means the product was removed at
+    the source. Column names are to be confirmed (EDA E01).
+  usage: Read-only. File products_YYYYMMDD.csv, full snapshot, only on change.
+schema:
+  - name: products
+    physicalName: inbound/retail/products
+    physicalType: file
+    logicalType: object
+    description: One row = one product. CSV, UTF-8, comma, RFC 4180, header row.
+    properties:
+      - name: product_code
+        logicalType: string
+        physicalType: string
+        required: true
+        primaryKey: true
+        description: Business key.
+      - name: product_name
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Product name.
+      - name: brand
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Brand, inconsistent spelling.
+      - name: category_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Category, references reference.categories.
+      - name: created_at
+        logicalType: timestamp
+        physicalType: string
+        required: false
+        description: Creation time, local time.
+      - name: updated_at
+        logicalType: timestamp
+        physicalType: string
+        required: false
+        description: Last change time, local time.
+team:
+  - username: retail-team
+    role: owner
+support:
+  - channel: retail-dataops
+    tool: teams
+customProperties:
+  - property: loadStrategy
+    value: file_new_or_changed
+  - property: kind
+    value: snapshot
+  - property: fileGlob
+    value: "*.csv"
+  - property: settleMinutes
+    value: 5
+  - property: sourceTimezone
+    value: Asia/Ho_Chi_Minh
+  - property: timestampFormats
+    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+  - property: deliveryCadence
+    value: on_change
+  - property: quarantineWarnPct
+    value: 2
+  - property: quarantineFailPct
+    value: 20
+  - property: silverTable
+    value: slv.products_history
