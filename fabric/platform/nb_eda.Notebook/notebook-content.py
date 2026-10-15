@@ -101,6 +101,9 @@ def guard(fn):
 # CELL ********************
 
 section("Baseline v1 (Q19)")
+for sch in ("meta", "slv", "gld"):
+    print(f"\n>> bảng hiện có trong {sch}")
+    guard(lambda: spark.sql(f"SHOW TABLES IN {sch}").select("tableName").show(100, truncate=False))
 for sql in [
     "SELECT floor(date_key / 100) AS month_key, count(*) n, sum(gross_amount) gross, "
     "count_if(salesman_sk = -1) unk_salesman FROM gld.gld_f_sales_line GROUP BY 1 ORDER BY 1",
