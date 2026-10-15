@@ -6,7 +6,21 @@
 # META   "kernel_info": {
 # META     "name": "synapse_pyspark"
 # META   },
-# META   "dependencies": {}
+# META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse": "a2210167-f7b0-4566-a017-886910bd735c",
+# META       "default_lakehouse_name": "lh_sim",
+# META       "default_lakehouse_workspace_id": "a2127e64-3558-425b-9549-b371fd8bce0c",
+# META       "known_lakehouses": [
+# META         {
+# META           "id": "a2210167-f7b0-4566-a017-886910bd735c"
+# META         },
+# META         {
+# META           "id": "9fb95c8f-fbfa-4ead-91f0-ab104ab02a2a"
+# META         }
+# META       ]
+# META     }
+# META   }
 # META }
 
 # MARKDOWN ********************
@@ -25,6 +39,7 @@
 # - **Chạy lại sau lỗi:** state chưa tiến → cùng cửa sổ, ghi lại không nhân đôi. State chỉ tiến khi mọi bước thành công.
 # - **Exit value:** ngày giả lập mới (`YYYY-MM-DD`) → pipeline truyền làm `p_load_date` cho Platform.
 # - **Lịch:** hằng ngày 05:00 (1 ngày thật = 1 ngày giả lập), hoặc `pl_sim_drive` để tua nhiều ngày.
+
 
 # PARAMETERS CELL ********************
 

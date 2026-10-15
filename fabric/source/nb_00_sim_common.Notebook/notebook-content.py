@@ -105,6 +105,13 @@ TS_FORMATS = [
 # Dòng không xác định được ngày release → release ngay ở lần đầu
 EPOCH = dt.date(1900, 1, 1)
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # MARKDOWN ********************
 
 # ## Paths
@@ -145,6 +152,13 @@ def erp_entities() -> list:
 
 def table_exists(path: str) -> bool:
     return notebookutils.fs.exists(f"{path}/_delta_log")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # MARKDOWN ********************
 
@@ -216,6 +230,13 @@ def split_erp_rejects(entity: str, df: DataFrame):
     ok = df.filter("_reject_reason IS NULL").drop("_reject_reason")
     rejected = df.filter("_reject_reason IS NOT NULL")
     return ok, rejected
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # MARKDOWN ********************
 
@@ -305,6 +326,13 @@ def erp_replace_window_sql(entity: str, cols: list, window_from: dt.date, window
         f"INSERT INTO dbo.[{entity}] ({col_list}) SELECT {col_list} FROM sim.[stg_{entity}];"
     )
 
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # MARKDOWN ********************
 
 # ## Retail drop — ghi 1 file CSV đúng tên
@@ -329,6 +357,13 @@ def write_single_csv(df: DataFrame, target_file: str, order_by: str = "_row_no")
     part = next(f.path for f in notebookutils.fs.ls(tmp_dir) if f.name.startswith("part-"))
     notebookutils.fs.mv(part, target_file, True, True)
     notebookutils.fs.rm(tmp_dir, True)
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # MARKDOWN ********************
 
@@ -388,3 +423,10 @@ def reject_log_df(rejected: DataFrame, sim_run_id: str, source: str, entity: str
         F.to_json(F.struct(*business_columns(rejected))).alias("row_json"),
         F.current_timestamp().alias("logged_at"),
     )
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
