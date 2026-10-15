@@ -88,3 +88,11 @@ Người/agent: Claude (Sonnet 5.5), theo yêu cầu người dùng.
 - `nb_eda` đọc trực tiếp nguồn (drop zone CSV + Delta của item SQL Database trên OneLake), bỏ baseline và Landing v1; không cần `lh_platform`.
 - Thêm bảng "Phụ thuộc và thứ tự chạy" vào 06-tasks.
 Chưa kiểm chứng: đọc `Tables/dbo/<bảng>` của item SQL Database bằng đường dẫn OneLake; kiểu item `SQLDatabase` cho `resolve_item_id`.
+## 2026-10-15 — T0.3 EDA xong; T1.2 một phần — IN_PROGRESS
+Người/agent: Claude (Sonnet 5.5); chạy trên Fabric: anhnguyen
+Đã làm:
+- Kết quả E01–E20 vào `docs/EDA.md`; D39–D42 vào DECISIONS.
+- Contract: `retail.orders` (formats), `reference.categories` (bốn cột cấp thay `category_path`), ba master retail (bỏ ghi chú "chờ EDA"); các contract bị đổi bump `1.1.0`, vẫn `draft`.
+- Tài liệu: 04 (§5.4 categories, §6.3 R-PRD-02, §6.5 thêm `first_returned_at_utc`), 05 §2.2 (từ điển).
+Còn lại cho T1.2: E02b (định dạng thời gian master) rồi chuyển contract `active`; xác nhận múi giờ retail (D41); trả lời D42.
+Kiểm chứng Fabric: EDA đã chạy; chưa có code v2 nào chạy.

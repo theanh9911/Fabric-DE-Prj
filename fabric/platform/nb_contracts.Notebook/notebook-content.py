@@ -20,7 +20,7 @@
 CONTRACTS = {
     "reference.categories": {
         "id": "reference.categories",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "draft",
         "source_system": "reference",
         "entity": "categories",
@@ -30,7 +30,12 @@ CONTRACTS = {
         "support_channel": "data-platform",
         "columns": [
             {"name": "category_code", "logical_type": "string", "physical_type": "string", "required": True, "primary_key": True},
-            {"name": "category_path", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "category_lvl1", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "category_lvl2", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "category_lvl3", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "category_lvl4", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "created_at", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
+            {"name": "updated_at", "logical_type": "string", "physical_type": "string", "required": False, "primary_key": False},
         ],
         "quality": [
             {"check_id": "CT-reference.categories-01", "description": "category_code must be unique within a snapshot.", "query": "SELECT COUNT(*) FROM (SELECT upper(trim(category_code)) k FROM ${object} GROUP BY upper(trim(category_code)) HAVING COUNT(*) > 1)", "must_be": 0, "severity": "warning"},
@@ -54,7 +59,7 @@ CONTRACTS = {
     },
     "retail.customers": {
         "id": "retail.customers",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "draft",
         "source_system": "retail",
         "entity": "customers",
@@ -92,7 +97,7 @@ CONTRACTS = {
     },
     "retail.orders": {
         "id": "retail.orders",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "draft",
         "source_system": "retail",
         "entity": "orders",
@@ -127,8 +132,8 @@ CONTRACTS = {
         "file_glob": "*.csv",
         "settle_minutes": 5,
         "source_timezone": "Asia/Ho_Chi_Minh",
-        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"],
-        "date_formats": ["yyyy-MM-dd", "yyyy/MM/dd", "M/d/yyyy", "d/M/yyyy"],
+        "timestamp_formats": ["yyyy-MM-dd HH:mm:ss"],
+        "date_formats": ["yyyy-MM-dd", "d/M/yyyy"],
         "delivery_cadence": "daily",
         "available_by_local_time": "06:00",
         "quarantine_warn_pct": 2,
@@ -136,7 +141,7 @@ CONTRACTS = {
     },
     "retail.products": {
         "id": "retail.products",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "draft",
         "source_system": "retail",
         "entity": "products",
@@ -172,7 +177,7 @@ CONTRACTS = {
     },
     "retail.sales_hierarchy": {
         "id": "retail.sales_hierarchy",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "draft",
         "source_system": "retail",
         "entity": "sales_hierarchy",

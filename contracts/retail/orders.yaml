@@ -1,17 +1,17 @@
 apiVersion: v3.0.2
 kind: DataContract
 id: retail.orders
-version: 1.0.0
+version: 1.1.0
 status: draft
 description:
   purpose: >
     Order line status events from the retail channel, delivered as CSV files in the shared drop
     zone. Same meaning and grain as wholesale.orders (without order_line_id).
   limitations: >
-    All values are text. Dates and timestamps use several formats (3/15/2025 9:30, 25/3/2025,
-    2025-03-15) and carry no time zone (local Vietnam time). Numbers may be text, "NULL" appears
-    as a literal string, values may have extra spaces. A file may be re-sent with the same name
-    and corrected content. Column names are to be confirmed (EDA E01).
+    All values are text. Timestamps are yyyy-MM-dd HH:mm:ss and carry no time zone (assumed local
+    Vietnam time). order_date is yyyy-MM-dd, with a few rows as d/M/yyyy (day first; some of them
+    ambiguous when both numbers are 12 or less). "NULL" appears as a literal string, values may
+    have extra spaces. A file may be re-sent with the same name and corrected content.
   usage: >
     Read-only. First delivery is one history file orders_history_until_YYYYMMDD.csv, then one
     file per business day orders_YYYYMMDD.csv with new or changed events only.
@@ -111,9 +111,9 @@ customProperties:
   - property: sourceTimezone
     value: Asia/Ho_Chi_Minh
   - property: timestampFormats
-    value: ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss", "M/d/yyyy H:mm:ss", "M/d/yyyy H:mm", "d/M/yyyy H:mm:ss", "d/M/yyyy H:mm", "yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy"]
+    value: ["yyyy-MM-dd HH:mm:ss"]
   - property: dateFormats
-    value: ["yyyy-MM-dd", "yyyy/MM/dd", "M/d/yyyy", "d/M/yyyy"]
+    value: ["yyyy-MM-dd", "d/M/yyyy"]
   - property: deliveryCadence
     value: daily
   - property: availableByLocalTime

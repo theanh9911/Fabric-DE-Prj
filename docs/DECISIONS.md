@@ -49,6 +49,10 @@ Mỗi quyết định có ID cố định. Đổi một quyết định: thêm d
 | D25 | `order_date` sau ngày batch + 1 ⇒ REJECT `future_order_date` | lỗi nhập liệu (năm 2027) không được vào số liệu | 2026-10-14 |
 | D26 | Giá trị phụ thuộc dữ liệu (tên cột file, định dạng thời gian, múi giờ ERP, từ điển) chốt bằng EDA (T0.3), ghi vào contract và `nb_config` (T1.2, T2.1). Trước đó contract để `status: draft` với giá trị hiện có | không đoán; mỗi giá trị có bằng chứng | 2026-10-14 |
 | D31 | Ngày mơ hồ ở `updated_at` của file: parse theo thứ tự format trong contract, FLAG `ambiguous_date`, kèm DQ-SLV-07 đo lệch ngày sự kiện so với tên file. File trộn hai thứ tự trong cùng file ⇒ bắt nguồn chuẩn hoá ISO 8601 trước khi contract `active` | thứ tự sự kiện quyết định trạng thái hiện hành: không đoán lặng lẽ, nhưng không chặn chỉ vì mơ hồ | 2026-10-14 |
+| D39 | `Returned` là trạng thái thứ sáu: `STATUS_RANK` Pending 1, Confirmed 2, Shipped 3, Delivered 4, Returned 5, Cancelled 6; thêm cột `first_returned_at_utc` vào `gld.fct_order_line`. Thay quyết định bỏ `first_returned_at_utc` ngày 2026-10-14 | EDA E06: ~1.800 dòng có trạng thái này; REJECT sẽ làm mất dữ liệu thật và chạm ngưỡng quarantine | 2026-10-15 |
+| D40 | Từ điển `ORDER_STATUS`, `GENDER`, `POSITION`, `BRAND` lấy từ EDA E06, E13 (05 §2.2); `X` của gender và country/city/division không chuẩn hoá ở lượt này | chỉ map giá trị có bằng chứng; giá trị lạ vào FLAG `unmapped_value` thay vì đoán | 2026-10-15 |
+| D41 | `sourceTimezone`: wholesale `UTC` (DDL ERP dùng `sysutcdatetime()`); retail `Asia/Ho_Chi_Minh` là **giả định** vì dữ liệu không cho biết (E05); xác nhận với owner nguồn trước khi promote Prod | không suy ra được từ phân bố giờ của dữ liệu giả lập | 2026-10-15 |
+| D42 | Câu hỏi mở: số âm của `quantity`/`price` (E11) hiện đi qua Silver và Gold, chỉ cảnh báo ở contract; country, city, division chưa chuẩn hoá. Cần quyết định nghiệp vụ nếu muốn REJECT/FLAG hoặc thêm từ điển | không có quy tắc nghiệp vụ nào trong tài liệu | 2026-10-15 |
 
 ## 3. Kết quả spike
 

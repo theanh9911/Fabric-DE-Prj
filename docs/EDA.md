@@ -53,4 +53,29 @@ Mã đầy đủ ở `nb_eda`. Nếu `Tables/dbo/<bảng>` của item SQL Databa
 
 ## Kết quả
 
-<!-- Mỗi mục E01–E20: truy vấn, kết quả, kết luận, giá trị đã điền. -->
+Chạy ngày 2026-10-15 bằng `nb_eda` trên nguồn sau initial load tới 2025-12-31 (wholesale orders 41.874 dòng, retail orders 42.194).
+
+| # | Kết quả | Kết luận, giá trị đã điền |
+|---|---|---|
+| E01 | Cột retail khớp wholesale (orders không có `order_line_id`). Master giống nhau giữa hai nguồn; `sales_hierarchy` dùng `inserted_at`. Categories: `category_code, category_lvl1..category_lvl4, created_at, updated_at` (không có `category_path`) | Contract categories đổi sang bốn cột cấp; `slv.categories_history` và R-PRD-02 sửa theo (04 §5.4, §6.3) |
+| E02 | `created_at`, `updated_at` của orders ở cả hai nguồn chỉ có dạng `yyyy-MM-dd HH:mm:ss` | `timestampFormats` retail.orders = `["yyyy-MM-dd HH:mm:ss"]`. Master: xem E02b |
+| E03 | Retail `order_date`: 42.162 dòng `yyyy-MM-dd`; 32 dòng `d/M/yyyy` (22 chắc chắn d/M vì số đầu > 12, 9 mơ hồ, 1 hai số bằng nhau). Wholesale chỉ `yyyy-MM-dd` | `dateFormats` retail.orders = `["yyyy-MM-dd", "d/M/yyyy"]`; 9 dòng mơ hồ được FLAG `ambiguous_date` (D31) |
+| E04 | Không có dòng M/d chắc chắn nào (0); không file nào trộn hai thứ tự | thứ tự `d/M` là đúng cho nguồn này; mỗi delivery chỉ một file nên chưa kiểm được trộn theo file |
+| E05 | Giờ phân bố đều 0–23 (dữ liệu giả lập), không suy ra được múi giờ. `updated_at` có giá trị đến 2027-12-24 | Múi giờ lấy từ DDL: ERP `DEFAULT sysutcdatetime()` ⇒ `UTC` (D41). Dòng `updated_at` ở tương lai chỉ vào Landing khi `p_load_date` tới ngày đó (cửa sổ `virtual`) |
+| E06 | Ngoài 5 trạng thái đã biết còn `Returned` (retail 871, wholesale 916). Biến thể: `Confirmd`, `Pendng`, `Deliverd`, `Shippd`, `Cancel`, `Return` và các kiểu hoa/thường | thêm `Returned` làm trạng thái thứ sáu (D39); `ORDER_STATUS` ở 05 §2.2 |
+| E07 | Retail 0; wholesale 25 khoá có hai trạng thái cùng `(order_no, product_code, updated_at)` | `STATUS_RANK` phân thắng bại (R-ORD-04) đúng như thiết kế |
+| E08 | Không có event key trùng ở cả hai nguồn | R-ORD-02/03 vẫn giữ cho file gửi lại; chưa có dữ liệu thật để kiểm |
+| E09 | 80 `order_no` có ở cả hai nguồn (retail 5.470, wholesale 5.407) | xác nhận D20: grain gồm `source_system` |
+| E10 | `10%`, `8%`, `5%`, `15%`, `5`, `0.05`, `0.10`, `0.1`, `five percent`, NULL | R-STD-06 đủ; `TAX_WORDS = {"FIVEPERCENT": "0.05"}` |
+| E11 | `quantity`: số âm 50 (retail) và 40 (wholesale); retail có 23 dòng thập phân. `price`: số âm 44 và 33. Không có dấu `,`, không có giá trị không parse được | số âm hiện không bị REJECT (chỉ cảnh báo contract); xem câu hỏi mở ở DECISIONS D42. R-STD-07 giữ nhưng chưa có dữ liệu cần |
+| E12 | `order_date` năm 2027: 37 (retail), 42 (wholesale) | xác nhận D25 (REJECT `future_order_date`) |
+| E13 | gender: `F, M, Female, Male, Mael, m, female, UNKNOWN, X, NULL`; position: `Salesman, Sale, Salseman, SALESMAN, Team Lead, TEAM LEAD, Team lead, Manager, Director`; brand: ~25 giá trị có biến thể hoa/thường; country/city/division có nhiều biến thể (`USA`, `U.S.A.`, `United States`; `HCM`, `Ho Chi Minh City`, `HoChiMinh`; `north`, `Northern`) | `GENDER`, `POSITION`, `BRAND` ở 05 §2.2; `X` chưa map ⇒ FLAG `unmapped_value`. Country, city, division **không** chuẩn hoá (ngoài phạm vi, ghi D42) |
+| E14 | Dạng chữ: `UNKNOWN` (gender), một `category_code` và một `category_lvl2` dạng chữ; còn lại là NULL thật | `null_if_blank` đủ (R-STD-01) |
+| E15 | Chỉ `CAT005` trùng khoá trong `categories_20251231.csv` | R-MST-01; DQ-SLV-03 |
+| E16 | Retail: 1 salesman tự trỏ; wholesale: 1 manager không tồn tại; không có vòng dài hơn | contract `sales_hierarchy` đã có check tương ứng |
+| E17 | Customers: 6 khoá chung, lệch ở country 1, city 1, gender 2. Products: 22 khoá chung, lệch ở brand 4, category_code 2, product_name 1. Sales hierarchy: 0 khoá chung | `source_priority = ["wholesale", "retail"]` (D22) đúng cho từng thuộc tính |
+| E18 | Mồ côi: `CUS099` (retail 50, wholesale 33); `PRD021` (retail 689, wholesale 1.723) và `PRD999` (43, 27); không có salesman mồ côi | `PRD021` chiếm ~4% dòng wholesale ⇒ DQ-GLD-07 (ngưỡng 1%) sẽ WARN; đúng kỳ vọng, không phải lỗi |
+| E19 | `category_code` không có trong categories: `CAT010`, `CAT099` (cả hai nguồn), `CAT999` (retail), NULL (wholesale) | R-PRD-02 ⇒ `Unknown (pending)` |
+| E20 | Phần lớn dòng hàng có 4 sự kiện (tối đa 16). 147 dòng hàng retail và 267 wholesale có bước lùi trạng thái (ví dụ Delivered rồi Pending) | trạng thái hiện hành lấy theo `updated_at` mới nhất (R-ORD-04); mốc `first_*` vẫn là lần đầu; ghi nhận cho lớp KPI |
+
+Chưa xong: E02b (định dạng thời gian của file master) cần một lượt chạy ngắn; contract master retail còn danh sách format rộng cho tới khi có kết quả.

@@ -1,15 +1,15 @@
 apiVersion: v3.0.2
 kind: DataContract
 id: reference.categories
-version: 1.0.0
+version: 1.1.0
 status: draft
 description:
   purpose: >
     Shared product category reference, delivered as a full snapshot file whenever it changes.
     Not part of the ERP; used by both channels.
   limitations: >
-    CAT005 is sent twice with different casing (electronics/All-in-One and Electronics/AllInOne).
-    The path column name is to be confirmed (EDA E01); category_path is the working name.
+    CAT005 is sent twice in the same file with different casing (electronics/All-in-One and
+    Electronics/AllInOne). The hierarchy is delivered as four level columns, not as one path.
   usage: Read-only. File categories_YYYYMMDD.csv, full snapshot, only on change.
 schema:
   - name: categories
@@ -24,11 +24,36 @@ schema:
         required: true
         primaryKey: true
         description: Business key; referenced by products.category_code.
-      - name: category_path
+      - name: category_lvl1
         logicalType: string
         physicalType: string
         required: false
-        description: Category path separated by "/", up to 4 levels, e.g. Electronics/AllInOne.
+        description: Top level of the category hierarchy, e.g. Electronics.
+      - name: category_lvl2
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Second level; may be empty.
+      - name: category_lvl3
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Third level; may be empty.
+      - name: category_lvl4
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Fourth level; may be empty.
+      - name: created_at
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Creation time as delivered; not used by the platform.
+      - name: updated_at
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Last change time as delivered; not used by the platform.
     quality:
       - type: sql
         description: category_code must be unique within a snapshot.

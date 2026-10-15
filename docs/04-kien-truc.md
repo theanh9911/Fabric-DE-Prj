@@ -435,7 +435,8 @@ CREATE TABLE IF NOT EXISTS slv.sales_hierarchy_history (
 ) USING DELTA TBLPROPERTIES (delta.enableChangeDataFeed = true);
 
 CREATE TABLE IF NOT EXISTS slv.categories_history (
-  source_system STRING NOT NULL, category_code STRING NOT NULL, category_path STRING,
+  source_system STRING NOT NULL, category_code STRING NOT NULL,
+  category_lvl1 STRING, category_lvl2 STRING, category_lvl3 STRING, category_lvl4 STRING,
   is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_type STRING NOT NULL,
   _bk STRING NOT NULL, _record_hash STRING NOT NULL,
   _batch_id STRING NOT NULL, _delivery_id STRING NOT NULL, _delivered_at_utc TIMESTAMP NOT NULL,
@@ -449,7 +450,7 @@ CREATE TABLE IF NOT EXISTS slv.categories_history (
 | customers | `customer_code` ← `customer_code` (code, bắt buộc); `customer_name` (text); `country`, `city` (title); `gender` (dict:GENDER, giữ raw); `address` (text); `created_at_utc` ← `created_at` (ts); `updated_at_utc` ← `updated_at` (ts) |
 | products | `product_code` (code, bắt buộc); `product_name` (text); `brand` (dict:BRAND, giữ raw); `category_code` (code); `created_at_utc`, `updated_at_utc` (ts) |
 | sales_hierarchy | `salesman_code` (code, bắt buộc); `salesman_name` (text); `division` (title); `position` (dict:POSITION, giữ raw); `salesmanager_code` (code); `salesmanager_name` (text); `created_at_utc` ← `inserted_at` (ts); `updated_at_utc` ← `updated_at` (ts) |
-| categories | `category_code` (code, bắt buộc); `category_path` (text) |
+| categories | `category_code` (code, bắt buộc); `category_lvl1` … `category_lvl4` (text) |
 
 `_record_hash` không tính `created_at_utc`, `updated_at_utc`, cột `*_raw`.
 
@@ -539,7 +540,7 @@ CREATE TABLE IF NOT EXISTS gld.fct_order_line (
   current_status STRING NOT NULL,
   quantity DECIMAL(18,2) NOT NULL, price DECIMAL(18,2) NOT NULL, tax_rate DECIMAL(9,6),
   first_pending_at_utc TIMESTAMP, first_confirmed_at_utc TIMESTAMP, first_shipped_at_utc TIMESTAMP,
-  first_delivered_at_utc TIMESTAMP, first_cancelled_at_utc TIMESTAMP,
+  first_delivered_at_utc TIMESTAMP, first_returned_at_utc TIMESTAMP, first_cancelled_at_utc TIMESTAMP,
   last_event_at_utc TIMESTAMP NOT NULL, status_event_count INT NOT NULL,
   _row_hash STRING NOT NULL,
   _run_id STRING NOT NULL, _logic_version INT NOT NULL, _updated_at_utc TIMESTAMP NOT NULL
@@ -614,7 +615,7 @@ Notebook của object liệt kê ID rule nó áp dụng ở cell Markdown đầu
 | R-CUS-01 | Gold | Survivorship khách hàng: với từng thuộc tính, lấy giá trị khác NULL theo thứ tự `SETTINGS.source_priority`; chỉ xét dòng hiện hành chưa xoá |
 | R-CUS-02 | Gold | `is_deleted = true` khi mọi nguồn có mã đó đều đã xoá |
 | R-PRD-01 | Gold | Survivorship sản phẩm như R-CUS-01 |
-| R-PRD-02 | Gold | Danh mục: nối `category_code` với `slv.v_categories_current` chưa xoá; tách `category_path` theo `/` thành l1–l4; không tìm thấy ⇒ `category_path = 'Unknown (pending)'` |
+| R-PRD-02 | Gold | Danh mục: nối `category_code` với `slv.v_categories_current` chưa xoá; `category_l1`–`category_l4` lấy từ `category_lvl1`–`category_lvl4`; `category_path` = các cấp khác NULL nối bằng `/`; không tìm thấy ⇒ `category_path = 'Unknown (pending)'` |
 | R-INF-01 | Gold | Mã có trong orders mà không có master ⇒ inferred member: tên `Unknown (pending)`, `is_inferred = true`, cùng công thức SK; khi master tới, dòng được cập nhật tại chỗ |
 | R-SLM-01 | Gold | SCD2 theo `salesman_name`, `division`, `position`, `salesmanager_code`, `is_deleted` |
 | R-SLM-02 | Gold | Phiên bản đầu tiên của mỗi `(source_system, salesman_code)` có `valid_from = 1900-01-01` |

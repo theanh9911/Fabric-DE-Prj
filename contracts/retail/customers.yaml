@@ -1,14 +1,14 @@
 apiVersion: v3.0.2
 kind: DataContract
 id: retail.customers
-version: 1.0.0
+version: 1.1.0
 status: draft
 description:
   purpose: Customer master of the retail channel, delivered as a full snapshot file whenever it changes.
   limitations: >
-    All values are text with mixed date formats and local time. A key missing from a newer
-    snapshot means the customer was removed at the source. The same customer_code may exist in
-    wholesale with different attributes. Column names are to be confirmed (EDA E01).
+    All values are text with local time and no time zone. A key missing from a newer snapshot
+    means the customer was removed at the source. The same customer_code may exist in wholesale
+    with different attributes (gender, country, city). Gender values have spelling variants.
   usage: Read-only. File customers_YYYYMMDD.csv, full snapshot, only on change.
 schema:
   - name: customers

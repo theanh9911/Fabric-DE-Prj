@@ -53,16 +53,22 @@ Chỉ chứa định nghĩa và `validate_config()`; không đọc/ghi dữ li�
 
 ### 2.2 Từ điển
 
-Khoá của mọi từ điển = `dict_key(giá trị thô)`: chữ hoa, bỏ ký tự không phải chữ. Danh sách đầy đủ điền từ EDA (T0.3).
+Khoá của mọi từ điển = `dict_key(giá trị thô)`: chữ hoa, bỏ ký tự không phải chữ. Danh sách dưới đây lấy từ EDA (E06, E13); giá trị mới xuất hiện ở nguồn thì thêm vào đây và tăng `logic_version` của bảng Silver.
 
 ```python
-ORDER_STATUS = {"PENDING": "Pending", "CONFIRMED": "Confirmed", "SHIPPED": "Shipped",
-                "DELIVERED": "Delivered", "DELIVRED": "Delivered", "CANCELLED": "Cancelled"}
-STATUS_RANK = {"Pending": 1, "Confirmed": 2, "Shipped": 3, "Delivered": 4, "Cancelled": 5}
+ORDER_STATUS = {"PENDING": "Pending", "PENDNG": "Pending", "CONFIRMED": "Confirmed", "CONFIRMD": "Confirmed",
+                "SHIPPED": "Shipped", "SHIPPD": "Shipped", "DELIVERED": "Delivered", "DELIVERD": "Delivered",
+                "RETURNED": "Returned", "RETURN": "Returned", "CANCELLED": "Cancelled", "CANCEL": "Cancelled"}
+STATUS_RANK = {"Pending": 1, "Confirmed": 2, "Shipped": 3, "Delivered": 4, "Returned": 5, "Cancelled": 6}
 TAX_WORDS = {"FIVEPERCENT": "0.05"}
-GENDER = {}
-POSITION = {}
-BRAND = {}
+GENDER = {"F": "Female", "FEMALE": "Female", "M": "Male", "MALE": "Male", "MAEL": "Male", "UNKNOWN": "Unknown"}
+POSITION = {"SALESMAN": "Salesman", "SALE": "Salesman", "SALSEMAN": "Salesman", "TEAMLEAD": "Team Lead",
+            "MANAGER": "Manager", "DIRECTOR": "Director"}
+BRAND = {"IKEA": "IKEA", "APPLE": "Apple", "ZARA": "Zara", "UNIQLO": "Uniqlo", "HP": "HP", "LENOVO": "Lenovo",
+         "SAMSUNG": "Samsung", "HM": "H&M", "DELL": "Dell", "ACER": "Acer", "TRUNGNGUYEN": "Trung Nguyen",
+         "RAZER": "Razer", "OPPO": "OPPO", "XIAOMI": "Xiaomi", "ASUS": "Asus", "MAXWELLHOUSE": "Maxwell House",
+         "HIGHLANDSCOFFEE": "Highlands Coffee", "LEVIS": "Levi's", "STARBUCKS": "Starbucks",
+         "MICROSOFT": "Microsoft", "NESTLE": "Nestle", "NESCAFE": "Nescafe", "VIVO": "Vivo", "MSI": "MSI"}
 DICTIONARIES = dict(ORDER_STATUS=ORDER_STATUS, STATUS_RANK=STATUS_RANK, TAX_WORDS=TAX_WORDS,
                     GENDER=GENDER, POSITION=POSITION, BRAND=BRAND)
 ```

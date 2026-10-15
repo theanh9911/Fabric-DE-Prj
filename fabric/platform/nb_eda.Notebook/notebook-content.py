@@ -177,6 +177,17 @@ def e02():
 guard(e02)
 
 
+def e02b():
+    for (s, e), df in MASTERS:
+        for c in ("created_at", "inserted_at", "updated_at"):
+            if has(df, c):
+                freq(f"{s}.{e}.{c} (hình dạng)", df, shape(col(df, c)), 8)
+
+
+section("E02b định dạng thời gian của master")
+guard(e02b)
+
+
 def dm_class(e):
     a = F.regexp_extract(e, r"^(\d{1,2})/(\d{1,2})/(\d{4})", 1).cast("int")
     b = F.regexp_extract(e, r"^(\d{1,2})/(\d{1,2})/(\d{4})", 2).cast("int")

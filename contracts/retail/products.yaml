@@ -1,13 +1,13 @@
 apiVersion: v3.0.2
 kind: DataContract
 id: retail.products
-version: 1.0.0
+version: 1.1.0
 status: draft
 description:
   purpose: Product master of the retail channel, delivered as a full snapshot file whenever it changes.
   limitations: >
     All values are text. A key missing from a newer snapshot means the product was removed at
-    the source. Column names are to be confirmed (EDA E01).
+    the source. Brand has case and spelling variants; category_code may reference a missing category.
   usage: Read-only. File products_YYYYMMDD.csv, full snapshot, only on change.
 schema:
   - name: products
