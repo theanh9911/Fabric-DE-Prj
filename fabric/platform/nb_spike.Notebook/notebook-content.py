@@ -18,10 +18,28 @@
 # K06, K07, K08, K11, K12 cần pipeline (`pl_spike`) — dựng bằng giao diện Fabric, không kiểm được ở notebook.
 # K03 tự tìm workspace và lakehouse Source theo tên (`p_source_workspace`, `p_drop_lakehouse`); cũng là thử `resolve_source_ids`.
 
+# MARKDOWN ********************
+
+# ## Dựng `pl_spike` (K06, K07, K08, K11, K12)
+# Tạo pipeline `pl_spike` trong CompanyA-DataPlatform. Tham số của notebook activity (`nb_spike`): `p_fail`, `p_exit_items`, `p_exit_pad`.
+#
+# 1. **Activity `nb`** (Notebook → `nb_spike`, `p_fail = false`). Ghi lại `exitValue`: có `source_workspace_id`, `drop_lakehouse_id`, `sources`.
+# 2. **K08**: ForEach, `Items` = `@json(activity('nb').output.result.exitValue).sources`; bên trong một activity Set variable ghi `@item().id`. Thử tăng `p_exit_items` (9 → 100 → 1000) với `p_exit_pad = 400` cho tới khi hỏng: ghi kích thước exit value tối đa.
+# 3. **K11a**: Copy. Nguồn = SQL database `sqldb_erp_wholesale` (Connection), truy vấn `SELECT * FROM dbo.customers`. Đích = `lh_platform`, Files, thư mục `_staging/spike_a`, Parquet. Ghi: `rowsRead`; thư mục đích tạo ra thế nào.
+# 4. **K11b**: Copy. Nguồn = Lakehouse `lh_retail_drop` (Connection), Files, thư mục `inbound/retail/orders`, wildcard `*.csv`, lọc *Last modified* theo khoảng; định dạng Binary. Đích = `lh_platform`, `_staging/spike_b`, **Flatten hierarchy**. Ghi: có lọc đúng khoảng không.
+# 5. **K11c**: lặp K11b nhưng workspace ID và lakehouse ID lấy từ `@json(activity('nb').output.result.exitValue).source_workspace_id` / `.drop_lakehouse_id` (dynamic content). Ghi: dùng được không, cần Connection gì.
+# 6. **K11e**: Copy K11b với khoảng *Last modified* không có file nào. Ghi: có tạo thư mục đích không, `rowsRead`/`filesRead`.
+# 7. **K06**: Settings của pipeline → Concurrency = 1; Git sync giữ giá trị này không (xem `pipeline-content.json`). Chạy hai lượt cách nhau vài giây; ghi lượt hai bị xếp hàng, huỷ hay chạy song song.
+# 8. **K07**: thêm activity Teams (Activities → Notifications). Ghi: có trong Data pipeline không; cần Connection/quyền gì; gửi vào chat hay kênh.
+# 9. **K12**: ba activity nối `nb (p_fail = true)` → `a2` (Wait 1s) → `a3` (Wait 1s). Thêm `catch` (Set variable) có `dependsOn` `a3` với điều kiện **Failed** và **Skipped**. Chạy: `catch` có chạy không; lấy được lỗi bằng `@activity('nb').error.message` không. Lặp lại với lỗi ở `a2`.
+
 # PARAMETERS CELL ********************
 
 p_source_workspace = "CompanyA-Source"
 p_drop_lakehouse = "lh_retail_drop"
+p_fail = False
+p_exit_items = 9
+p_exit_pad = 400
 
 # METADATA ********************
 
@@ -34,6 +52,9 @@ p_drop_lakehouse = "lh_retail_drop"
 
 import json
 import traceback
+
+if p_fail:
+    raise RuntimeError("spike deliberate failure (K12)")
 
 RESULTS = {}
 
@@ -229,6 +250,18 @@ spark.sql("DROP SCHEMA IF EXISTS tst CASCADE")
 if notebookutils.fs.exists("Files/_spike"):
     notebookutils.fs.rm("Files/_spike", True)
 print(json.dumps(RESULTS, indent=2, ensure_ascii=False, default=str))
+
+# Giá trị trả về cho pipeline (K08: dùng làm items của ForEach; K11c: ID động cho Copy).
+import sempy.fabric as fabric
+
+_ws = fabric.resolve_workspace_id(p_source_workspace)
+_lh = fabric.resolve_item_id(p_drop_lakehouse, "Lakehouse", _ws)
+notebookutils.notebook.exit(json.dumps({
+    "source_workspace_id": _ws,
+    "drop_lakehouse_id": _lh,
+    "sources": [{"id": f"src{i}", "query": "SELECT * FROM dbo.t " + "x" * p_exit_pad}
+                for i in range(p_exit_items)],
+}))
 
 # METADATA ********************
 

@@ -74,3 +74,10 @@ Kết quả: K03 PASS; lặp lại K01, K02, K04, K05, K09, K10 cùng kết qu�
 Phát hiện: `fs.ls` ở `Files/inbound` của `lh_retail_drop` trả 6 mục, mục đầu tên `categories` — có thể cây thực tế khác `physicalName` trong contract (`inbound/reference/categories`, `inbound/retail/orders`). Đã mở rộng K03 để in cây thư mục (4 cấp); chờ chạy lại.
 Sửa: bảng DECISIONS §3 bị hỏng ký tự ở lượt trước (lỗi escape khi ghi file), đã viết lại.
 Còn lại: K06, K07, K08, K11, K12 cần `pl_spike`.
+## 2026-10-15 — T0.1, T0.2, T0.3: notebook cho người chạy — IN_PROGRESS
+Người/agent: Claude (Sonnet 5.5)
+Đã làm:
+- `nb_eda` (tạm): Q19 baseline v1 (T0.1) và E01–E20 (T0.3) trên Landing v1; chỉ đọc.
+- `nb_spike`: thêm tham số `p_fail`, `p_exit_items`, `p_exit_pad`, trả `exitValue` (ID Source, danh sách `sources`) và hướng dẫn dựng `pl_spike` (K06, K07, K08, K11, K12) trong cell Markdown.
+Phát hiện: drop zone Source có hai layout (phẳng `inbound/<entity>/` ghi 6/10 bởi simulator cũ — v1 cũng đọc đường dẫn này; `inbound/retail/<entity>/` ghi 12/10 chỉ có ngày 20260102). Contract trỏ layout mới; xử lý bằng reset Source ở T2.6.
+Kiểm chứng Fabric: chưa kiểm chứng (chưa chạy `nb_eda`, `pl_spike`).
