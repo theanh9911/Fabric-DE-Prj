@@ -147,9 +147,10 @@ def build(decision):
         codes = source_codes(True, iv, "salesman_code")
     vers = versions()
     existing = spark.table(TARGET)
+    known = existing.where("false") if full else existing   # full: dựng lại, không giữ inferred cũ
     keys = ["source_system", "salesman_code"]
     inferred = (codes.join(vers.select(*keys).distinct(), keys, "left_anti")
-                .join(existing.select(*keys).distinct(), keys, "left_anti")
+                .join(known.select(*keys).distinct(), keys, "left_anti")
                 .withColumn("salesman_name", F.lit(PENDING)).withColumn("division", F.lit(None).cast("string"))
                 .withColumn("position", F.lit(None).cast("string"))
                 .withColumn("manager_code", F.lit(None).cast("string"))

@@ -139,10 +139,11 @@ def build(decision):
         codes = source_codes(True, iv, "customer_code")
     surv = survivors()
     existing = spark.table(TARGET)
+    known = existing.where("false") if full else existing   # full: dựng lại, không giữ inferred cũ
     agg = (codes.groupBy("customer_code")
            .agg(F.concat_ws(",", F.array_sort(F.collect_set("source_system"))).alias("source_systems")))
     inferred = (agg.join(surv.select("customer_code"), "customer_code", "left_anti")
-                .join(existing.select("customer_code"), "customer_code", "left_anti")
+                .join(known.select("customer_code"), "customer_code", "left_anti")
                 .withColumn("customer_name", F.lit("Unknown (pending)"))
                 .withColumn("is_deleted", F.lit(False)).withColumn("is_inferred", F.lit(True)))
     parts = [surv, inferred]
