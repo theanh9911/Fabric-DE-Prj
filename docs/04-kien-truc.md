@@ -76,7 +76,7 @@ Mọi notebook chạy từ pipeline hoặc chạy tay phải gắn `lh_platform`
 - **Ingest chỉ bằng Copy activity của pipeline, qua Connection.** Notebook không đọc dữ liệu nguồn (không JDBC, không token, không copy file); `nb_plan` chỉ liệt kê tên file ở drop zone.
 - Copy ghi vào `Files/_staging/<delivery_id>/`. `nb_land` đếm, tính checksum, rồi `notebookutils.fs.mv` sang Landing và ghi `_manifest.json` sau cùng. Thư mục Landing có manifest là delivery hợp lệ; thư mục không có manifest (lượt chết giữa `mv` và ghi manifest) bị bỏ qua và nguồn đó được lấy lại ở lượt sau.
 - Copy không retry (staging có thể còn file dở). Lỗi ⇒ lượt sau lấy lại; staging cũ bị dọn bởi `nb_maintenance`.
-- Copy không tạo thư mục đích khi không có file nào (spike K11e). `nb_land` kiểm `fs.exists(staging_path)` trước: không có thư mục ⇒ `NO_DATA`, không phải lỗi.
+- Chưa biết Copy có tạo thư mục đích khi không có file nào hay không (K11e chưa phân biệt được). `nb_land` xử lý cả hai: `fs.exists(staging_path)` sai hoặc thư mục không có file dữ liệu ⇒ `NO_DATA`, không phải lỗi.
 - Không ghi đè, không xoá Landing (L2).
 - `batch_id` = `yyyyMMdd` của `p_load_date`.
 

@@ -124,3 +124,5 @@ Kết quả: khi 0 file, Copy không tạo thư mục đích. Đã sửa 04 §3.
 ## 2026-10-15 — T0.2 K06 bỏ qua (D44)
 Người dùng quyết định bỏ K06 (không thực tế dựng lượt chạy chồng). Ghi D44: giữ `concurrency: 1` làm lớp phụ, đúng đắn dựa vào ghi idempotent; tiêu chí "xong khi" T3.3 sửa theo.
 Còn lại của T0.2: K07 (Teams), K11c (ID động).
+## 2026-10-15 — Đính chính K11e
+Mục "T0.2 K11e (tiếp)" và commit `6918d5c` ghi "Copy không tạo thư mục đích khi 0 file" là **chưa kiểm chứng** (thư mục đích đã có từ trước nên không phân biệt được). Đã sửa 04 §3.1 và DECISIONS: nb_land xử lý cả hai trường hợp. Nguyên nhân: lệnh ghi bị ngắt bởi người dùng vẫn hoàn tất; từ nay sẽ kiểm `git log` sau khi bị ngắt.
