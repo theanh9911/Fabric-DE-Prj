@@ -68,3 +68,9 @@ Kết quả: K01, K02, K04, K05, K09, K10 PASS (chi tiết DECISIONS §3). Job `
 Phát hiện: `ansi = false` ⇒ `sum(bigint)` quay vòng im lặng; overwrite ghi `operation = CREATE OR REPLACE TABLE AS SELECT`; `fs.rm` ném lỗi khi path không tồn tại.
 Tài liệu đã sửa: DECISIONS §3, 05 §4.6 (`last_commit_metrics`), TROUBLESHOOTING (dòng ANSI).
 Còn lại: K03 (truyền hai ID), K06, K07, K08, K11, K12 cần `pl_spike`.
+## 2026-10-15 — T0.2 lượt 2 (nb_spike, K03) — IN_PROGRESS
+Người/agent: Claude (Sonnet 5.5); chạy trên Fabric: anhnguyen
+Kết quả: K03 PASS; lặp lại K01, K02, K04, K05, K09, K10 cùng kết quả lượt 1.
+Phát hiện: `fs.ls` ở `Files/inbound` của `lh_retail_drop` trả 6 mục, mục đầu tên `categories` — có thể cây thực tế khác `physicalName` trong contract (`inbound/reference/categories`, `inbound/retail/orders`). Đã mở rộng K03 để in cây thư mục (4 cấp); chờ chạy lại.
+Sửa: bảng DECISIONS §3 bị hỏng ký tự ở lượt trước (lỗi escape khi ghi file), đã viết lại.
+Còn lại: K06, K07, K08, K11, K12 cần `pl_spike`.

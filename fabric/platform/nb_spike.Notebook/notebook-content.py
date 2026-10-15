@@ -107,13 +107,22 @@ def k03():
     import sempy.fabric as fabric
     ws_id = fabric.resolve_workspace_id(p_source_workspace)
     lh_id = fabric.resolve_item_id(p_drop_lakehouse, "Lakehouse", ws_id)
-    path = f"abfss://{ws_id}@onelake.dfs.fabric.microsoft.com/{lh_id}/Files/inbound"
-    entries = notebookutils.fs.ls(path)
-    first = entries[0] if entries else None
+    root = f"abfss://{ws_id}@onelake.dfs.fabric.microsoft.com/{lh_id}/Files/inbound"
+
+    def walk(path, depth):
+        out = []
+        for f in notebookutils.fs.ls(path):
+            out.append({"path": f.path.split("/Files/inbound", 1)[-1], "isDir": f.isDir,
+                        "size": f.size, "modifyTime": f.modifyTime})
+            if f.isDir and depth > 1:
+                out.extend(walk(f.path, depth - 1))
+        return out
+
+    tree = walk(root, 4)
+    files = [x for x in tree if not x["isDir"]]
     return {"resolved": {"workspace_id": ws_id, "lakehouse_id": lh_id},
-            "count": len(entries),
-            "attrs": [a for a in dir(first) if not a.startswith("_")] if first else None,
-            "sample": {"name": first.name, "size": first.size, "modifyTime": first.modifyTime} if first else None}
+            "dirs": [x["path"] for x in tree if x["isDir"]],
+            "file_count": len(files), "files_sample": files[:5]}
 
 record("K03", k03)
 
