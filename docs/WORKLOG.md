@@ -133,3 +133,5 @@ File: fabric/platform/nb_config.Notebook/notebook-content.py (giữ nguyên logi
 Tài liệu đã sửa: 06-tasks (trạng thái).
 Kiểm tra local: nạp `nb_contracts` + `nb_config` bằng Python thuần ⇒ "Validated 9 contracts, 5 silver, 5 gold, 0 checks"; thêm chu trình vào GOLD ⇒ V06 báo "gld.dim_date -> gld.fct_order_line -> gld.dim_date". `check_repo.py` OK.
 Kiểm chứng Fabric: chưa kiểm chứng (chưa chạy notebook trên Fabric).
+## 2026-10-15 — T0.2 phạm vi còn lại
+Theo người dùng: chỉ K11c (ID động cho Connection) còn cần trước T3.3; K07 hoãn tới T6.1; K06 đã bỏ (D44).

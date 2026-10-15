@@ -41,7 +41,7 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | Task | Tên | Trạng thái | Phụ thuộc |
 |---|---|---|---|
 | T0.1 | Baseline số liệu v1 | BỎ (D38) | — |
-| T0.2 | Spike runtime K01–K12 | IN_PROGRESS (còn K07, K11c) | — |
+| T0.2 | Spike runtime K01–K12 | IN_PROGRESS (còn K11c; K06 bỏ, K07 hoãn tới T6.1) | — |
 | T0.3 | EDA nguồn | DONE | — |
 | T0.4 | `pyproject.toml` + `tools/check_repo.py` | REVIEW | — |
 | T1.1 | `tools/build_contracts.py` + `nb_contracts` | REVIEW | T0.4 |
