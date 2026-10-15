@@ -113,3 +113,6 @@ Còn lại: K11c, K11e, K06, K07, K12; thử Preserve hierarchy.
 ## 2026-10-15 — T0.2 K11b2: Preserve hierarchy — IN_PROGRESS
 Kết quả: Copy behavior Preserve hierarchy giữ nguyên tên file ở staging (`orders_history_until_20251231.csv`). Đã sửa 04 §3.3 và DECISIONS K11.
 Còn lại của T0.2: K11c (ID động), K11e (0 file), K06, K07, K12.
+## 2026-10-15 — T0.2 K12 — IN_PROGRESS
+Kết quả: K12 PASS (nhánh Failed + Skipped ở cuối chuỗi bắt được lỗi; `error.message` chứa `errorValue` của notebook). Chi tiết DECISIONS §3.
+Còn lại của T0.2: K11c (ID động cho Connection), K11e (0 file), K06 (concurrency), K07 (Teams).
