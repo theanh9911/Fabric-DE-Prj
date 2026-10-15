@@ -62,3 +62,9 @@ Kiểm tra local: `uv run tools/build_contracts.py --check` → OK 9 contract. `
 Thử âm: sửa `version` YAML không sinh lại → `--check` FAIL; xoá `watermarkColumn` của `wholesale.orders` → BC04; `%run` chung cell → C02; `--strict` → BC10 cho 9 contract draft.
 Kiểm chứng Fabric: chưa kiểm chứng (nb_spike chưa chạy).
 Còn lại / câu hỏi: người chạy `nb_spike` và dựng `pl_spike`, ghi kết quả vào DECISIONS §3 (T0.2); chạy T0.1, T0.3 trên Dev. Chưa bắt đầu T2.x vì phụ thuộc kết quả spike/EDA.
+## 2026-10-15 — T0.2 lượt 1 (nb_spike) — IN_PROGRESS
+Người/agent: Claude (Sonnet 5.5); chạy trên Fabric: anhnguyen   Runtime: Spark 4.1.1.5.5.20260930
+Kết quả: K01, K02, K04, K05, K09, K10 PASS (chi tiết DECISIONS §3). Job `saveAsTable` Failed trong cell K10 là lỗi mong đợi (ghi NULL vào cột NOT NULL).
+Phát hiện: `ansi = false` ⇒ `sum(bigint)` quay vòng im lặng; overwrite ghi `operation = CREATE OR REPLACE TABLE AS SELECT`; `fs.rm` ném lỗi khi path không tồn tại.
+Tài liệu đã sửa: DECISIONS §3, 05 §4.6 (`last_commit_metrics`), TROUBLESHOOTING (dòng ANSI).
+Còn lại: K03 (truyền hai ID), K06, K07, K08, K11, K12 cần `pl_spike`.

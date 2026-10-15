@@ -51,19 +51,24 @@ Mỗi quyết định có ID cố định. Đổi một quyết định: thêm d
 
 ## 3. Kết quả spike
 
-Điền ở T0.2.
+Điền ở T0.2. Lượt 1 (2026-10-15, 
+b_spike): K01, K02, K04, K05, K09, K10. Còn K03 (cần tham số) và K06, K07, K08, K11, K12 (cần pl_spike).
 
 | Spike | Kết quả | Runtime | Ghi chú, tài liệu đã sửa |
 |---|---|---|---|
-| K01 `table_changes` | | | |
-| K02 `NOT MATCHED BY SOURCE` | | | |
+| K01 	able_changes | PASS | Spark 4.1.1.5.5.20260930 | MERGE ⇒ update_preimage/update_postimage; DELETE ⇒ delete; overwrite ⇒ delete + insert cho mọi dòng còn lại. Đúng giả định, không sửa tài liệu |
+| K02 NOT MATCHED BY SOURCE | PASS | Spark 4.1.1.5.5.20260930 | sync_table dùng một câu MERGE như 05 §4.6 |
 | K03 `fs.ls` có `size`, `modifyTime` | | | |
-| K04 `fs.mv` thư mục | | | |
-| K05 Spark / ANSI / `try_to_timestamp` | | | |
+| K04 s.mv thư mục | PASS | Spark 4.1.1.5.5.20260930 | mv(src, dst, True) trả True, staging biến mất, file nằm đúng ở đích. s.rm trên path không tồn tại **ném lỗi** ⇒ luôn kiểm s.exists trước |
+| K05 Spark / ANSI / 	ry_to_timestamp | PASS | Spark 4.1.1.5.5.20260930 | Spark 4.1.1; 	ry_to_timestamp có, 'abc' ⇒ NULL. spark.sql.ansi.enabled = false: sum(bigint) tràn **quay vòng im lặng** (9223372036854775807 + 1 = -9223372036854775808) ⇒ checksum decimal(38,0) là bắt buộc, không phải tuỳ chọn. CAST hỏng cho NULL; vẫn dùng 	ry_cast để không phụ thuộc cấu hình |
 | K06 pipeline `concurrency` | | | |
 | K07 activity Teams | | | |
 | K08 exit value trong expression | | | |
-| K09 `operationMetrics` | | | |
-| K10 DDL `NOT NULL` + overwrite | | | |
+| K09 operationMetrics | PASS có điều kiện | Spark 4.1.1.5.5.20260930 | MERGE có 
+umTargetRowsInserted/Updated/Deleted; WRITE có 
+umOutputRows; **overwrite qua saveAsTable ghi operation = 'CREATE OR REPLACE TABLE AS SELECT'** (chỉ 
+umOutputRows, không đếm dòng xoá); DELETE chỉ có 
+umDeletedRows. Đã sửa 05 §4.6 last_commit_metrics theo operation |
+| K10 DDL NOT NULL + overwrite | PASS | Spark 4.1.1.5.5.20260930 | overwrite overwriteSchema=false giữ NOT NULL; ghi NULL ⇒ DeltaInvariantViolationException [DELTA_NOT_NULL_CONSTRAINT_VIOLATED] kèm tên cột, bọc trong Py4JJavaError ⇒ bắt Exception và đọc mã trong thông điệp. Không cần kiểm NOT NULL trong lign_to_target |
 | K11 Copy activity (DB → Parquet, file Binary + lọc last modified, ID động, `rowsRead`) | | | |
 | K12 nhánh lỗi bắt mọi activity | | | |

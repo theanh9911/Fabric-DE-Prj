@@ -35,7 +35,7 @@ F4 hoặc Trial có ít Spark compute; high concurrency giúp chia sẻ session 
 | Banner "Upgrade to Runtime 2.0" dù workspace đã dùng | thông báo chung hoặc UI chưa refresh | kiểm tra Spark settings thực tế, không đổi runtime chỉ vì banner |
 | Markdown bị gộp khi Git sync | editor Fabric diễn giải dòng trống và heading theo ranh giới cell | chia thành các Markdown cell riêng; xem preview sau sync |
 | Source và Platform ở workspace khác nhau | ranh giới có chủ đích; thêm item vào Explorer của Platform không cấp quyền đọc Lakehouse ở Source | kiểm tra đúng workspace và item trong tham số pipeline, và quyền đọc OneLake của identity chạy pipeline |
-| Runtime 2.0 bật ANSI | `CAST` lỗi thay vì ra NULL | dùng `try_cast`, `try_to_timestamp` |
+| ANSI tuỳ runtime/phiên | Spark 4.1.1 trên Fabric đo ở K05 có `ansi = false`: `CAST` hỏng ra NULL, `sum(bigint)` tràn quay vòng im lặng; nếu bật thì `CAST` lỗi | dùng `try_cast`, `try_to_timestamp`; checksum dùng `decimal(38,0)` |
 
 ## Pipeline và tham số
 

@@ -332,7 +332,7 @@ Quy ước chung:
 | `merge_events` | `(target, df) -> dict` | khoá `_event_key`; `WHEN MATCHED AND s._delivered_at_utc > t._delivered_at_utc AND s._record_hash <> t._record_hash THEN UPDATE`; `WHEN NOT MATCHED THEN INSERT` |
 | `merge_upsert` | `(target, df, keys, hash_col) -> dict` | `WHEN MATCHED AND t.<hash> <> s.<hash> THEN UPDATE`; `WHEN NOT MATCHED THEN INSERT` |
 | `sync_table` | `(target, df, keys, hash_col) -> dict` | `merge_upsert` + `WHEN NOT MATCHED BY SOURCE THEN DELETE` |
-| `last_commit_metrics` | `(target) -> dict` | `version`, `numTargetRowsInserted/Updated/Deleted` hoặc `numOutputRows` |
+| `last_commit_metrics` | `(target) -> dict` | dòng đầu của `DESCRIBE HISTORY`; trả `version`, `rows_inserted`, `rows_updated`, `rows_deleted` theo `operation` (K09): `MERGE` ⇒ `numTargetRowsInserted/Updated/Deleted`; `WRITE`, `CREATE OR REPLACE TABLE AS SELECT` ⇒ `numOutputRows` làm `rows_inserted`, 0 cho hai số còn lại; `DELETE` ⇒ `numDeletedRows`; operation khác ⇒ 0 |
 
 ### 4.7 CDF
 
