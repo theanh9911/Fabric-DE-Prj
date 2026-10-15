@@ -16,7 +16,7 @@
 # cell cuối in bảng để dán vào docs/DECISIONS.md §3. Dùng schema `tst`, xoá ở cuối.
 #
 # K06, K07, K08, K11, K12 cần pipeline (`pl_spike`) — dựng bằng giao diện Fabric, không kiểm được ở notebook.
-# K03 cần tham số `p_source_workspace_id`, `p_drop_lakehouse_id` (lấy từ URL của workspace/lakehouse Source).
+# K03 tự tìm workspace và lakehouse Source theo tên (`p_source_workspace`, `p_drop_lakehouse`); cũng là thử `resolve_source_ids`.
 
 # PARAMETERS CELL ********************
 
