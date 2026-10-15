@@ -191,7 +191,7 @@ Quyết định D38: làm lại từ đầu, không so với v1. Số liệu v2 
   - chạy ngày simulator đầu ⇒ Landing có delivery + manifest cho cả 9 source; `delivery_log` có `LANDED`; Q03 khớp;
   - chạy lại ⇒ source file `NO_DATA`, snapshot DB `UNCHANGED`, DB incremental `NO_DATA`;
   - cố ý sai tên Connection ⇒ lượt FAILED, `close_failed` ghi `run_log` `pipeline FAILED`;
-  - hai lượt cùng lúc ⇒ theo kết quả K06 (lượt sau bị hoãn, hoặc cả hai chạy mà số liệu không sai).
+  - hai lượt cùng lúc (bắt đầu hai lượt cho cùng `p_load_date`) ⇒ số liệu cuối cùng không sai và không nhân đôi (ghi idempotent, D44).
 
 ### T3.4 — `nb_dq`, `nb_recon`
 - **File:** `fabric/platform/nb_dq.Notebook/` (viết lại), `fabric/platform/nb_recon.Notebook/` (mới); `pl_master_daily` (activity `dq`, `recon`).

@@ -121,3 +121,6 @@ Kết quả: khoảng last modified không khớp file ⇒ Copy Succeeded, `file
 Còn lại của T0.2: K11c (ID động), K11e phần "thư mục đích có được tạo không", K06, K07.
 ## 2026-10-15 — T0.2 K11e (tiếp)
 Kết quả: khi 0 file, Copy không tạo thư mục đích. Đã sửa 04 §3.1 (nb_land coi staging không tồn tại là NO_DATA) và DECISIONS K11. Chưa thử Copy DB với 0 dòng.
+## 2026-10-15 — T0.2 K06 bỏ qua (D44)
+Người dùng quyết định bỏ K06 (không thực tế dựng lượt chạy chồng). Ghi D44: giữ `concurrency: 1` làm lớp phụ, đúng đắn dựa vào ghi idempotent; tiêu chí "xong khi" T3.3 sửa theo.
+Còn lại của T0.2: K07 (Teams), K11c (ID động).
