@@ -110,3 +110,6 @@ Kết quả: K08 PASS (ForEach tuần tự, `isSequential` phải đặt tườn
 Phát hiện thiết kế: Flatten hierarchy đổi tên file thành `data_<guid>.csv` ⇒ 04 §3.3 (khớp `expected_files` theo `(name, size)`) cần sửa sau khi thử Preserve hierarchy; staging cộng dồn nhiều lần chạy ⇒ thư mục staging theo `delivery_id`.
 Sự cố vận hành: nhánh `dev` remote đi trước (commit từ workspace Source) làm 5 lần push bị từ chối mà không báo; đã rebase và push lại, sau đó kiểm `git status -sb`. Binding `lh_platform` của `nb_spike` phải nằm trong Git, nếu không Update from Git gỡ mất.
 Còn lại: K11c, K11e, K06, K07, K12; thử Preserve hierarchy.
+## 2026-10-15 — T0.2 K11b2: Preserve hierarchy — IN_PROGRESS
+Kết quả: Copy behavior Preserve hierarchy giữ nguyên tên file ở staging (`orders_history_until_20251231.csv`). Đã sửa 04 §3.3 và DECISIONS K11.
+Còn lại của T0.2: K11c (ID động), K11e (0 file), K06, K07, K12.

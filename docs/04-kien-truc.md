@@ -105,7 +105,7 @@ Mọi notebook chạy từ pipeline hoặc chạy tay phải gắn `lh_platform`
 5. Không còn file ⇒ source không vào kế hoạch; `run_log` `ingest.<source_id>` `NO_DATA`, và nếu có file bị bước 2 loại thì `reason = settle_pending:<số file>` để phân biệt với "chưa có file mới".
 6. Còn file ⇒ kế hoạch có `expected_files` (tên, size), `source_folder`, `modified_start = min(modifyTime)`, `modified_end = max(modifyTime) + 1 giây`.
 
-Copy: nguồn = drop zone Lakehouse (`drop_lakehouse_id`) qua Connection, thư mục `source_folder`, Binary, wildcard `fileGlob`, lọc last modified trong [`modified_start`, `modified_end`); đích = `staging_path`, không giữ cấu trúc thư mục con.
+Copy: nguồn = drop zone Lakehouse (`drop_lakehouse_id`) qua Connection, thư mục `source_folder`, Binary, wildcard `fileGlob`, lọc last modified trong [`modified_start`, `modified_end`); đích = `staging_path`, Copy behavior **Preserve hierarchy** với `recursive = false` (nên không có thư mục con và tên file giữ nguyên); **không dùng Flatten hierarchy** vì nó đổi tên file thành `data_<guid>.csv` (spike K11).
 
 `nb_land`:
 
