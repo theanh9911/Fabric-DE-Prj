@@ -119,3 +119,5 @@ Còn lại của T0.2: K11c (ID động cho Connection), K11e (0 file), K06 (con
 ## 2026-10-15 — T0.2 K11e — IN_PROGRESS
 Kết quả: khoảng last modified không khớp file ⇒ Copy Succeeded, `filesRead = 0`, `filesWritten = 0`.
 Còn lại của T0.2: K11c (ID động), K11e phần "thư mục đích có được tạo không", K06, K07.
+## 2026-10-15 — T0.2 K11e (tiếp)
+Kết quả: khi 0 file, Copy không tạo thư mục đích. Đã sửa 04 §3.1 (nb_land coi staging không tồn tại là NO_DATA) và DECISIONS K11. Chưa thử Copy DB với 0 dòng.
