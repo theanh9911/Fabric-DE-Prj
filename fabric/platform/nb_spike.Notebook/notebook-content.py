@@ -20,8 +20,8 @@
 
 # PARAMETERS CELL ********************
 
-p_source_workspace_id = ""
-p_drop_lakehouse_id = ""
+p_source_workspace = "CompanyA-Source"
+p_drop_lakehouse = "lh_retail_drop"
 
 # METADATA ********************
 
@@ -104,15 +104,16 @@ record("K02", k02)
 # CELL ********************
 
 def k03():
-    if not (p_source_workspace_id and p_drop_lakehouse_id):
-        return "bỏ qua: chưa truyền p_source_workspace_id / p_drop_lakehouse_id"
-    path = f"abfss://{p_source_workspace_id}@onelake.dfs.fabric.microsoft.com/{p_drop_lakehouse_id}/Files/inbound"
+    import sempy.fabric as fabric
+    ws_id = fabric.resolve_workspace_id(p_source_workspace)
+    lh_id = fabric.resolve_item_id(p_drop_lakehouse, "Lakehouse", ws_id)
+    path = f"abfss://{ws_id}@onelake.dfs.fabric.microsoft.com/{lh_id}/Files/inbound"
     entries = notebookutils.fs.ls(path)
     first = entries[0] if entries else None
-    return {"count": len(entries),
+    return {"resolved": {"workspace_id": ws_id, "lakehouse_id": lh_id},
+            "count": len(entries),
             "attrs": [a for a in dir(first) if not a.startswith("_")] if first else None,
             "sample": {"name": first.name, "size": first.size, "modifyTime": first.modifyTime} if first else None}
-
 
 record("K03", k03)
 
