@@ -47,7 +47,7 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | T1.1 | `tools/build_contracts.py` + `nb_contracts` | REVIEW | T0.4 |
 | T1.2 | Hoàn thiện contract và từ điển theo EDA | REVIEW | T0.3, T1.1 |
 | T2.1 | `nb_config` | REVIEW | T1.2, T0.2 |
-| T2.2 | `nb_std` | TODO | T0.2 |
+| T2.2 | `nb_std` | REVIEW | T0.2 |
 | T2.3 | `nb_common` | TODO | T2.1, T2.2 |
 | T2.4 | `nb_setup_ddl` | TODO | T2.1 |
 | T2.5 | `nb_test_unit` | TODO | T2.3 |

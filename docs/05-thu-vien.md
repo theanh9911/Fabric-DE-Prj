@@ -200,7 +200,7 @@ Sinh biểu thức Spark SQL (chuỗi) cho từng kiểu chuẩn hoá và câu `
 | `decimal` | `parse_decimal(c)` | `invalid_number` |
 | `tax_rate` | `parse_tax_rate(c, TAX_WORDS)` | — |
 | `dict:<TÊN>` | `std_dict(c, DICTIONARIES[TÊN])` | `unknown_value` |
-| `lookup:<TÊN>` | `std_dict` trên cột canonical `from_column` | — |
+| `lookup:<TÊN>` | `lookup_expr` trên cột canonical `from_column` | — |
 
 Mã REJECT mặc định chỉ dùng khi cột không khai báo `reject_reason`. Mọi mã phải có trong [04 §7.2](04-kien-truc.md#72-mã-lý-do).
 
@@ -226,7 +226,8 @@ Mỗi hàm nhận biểu thức SQL (chuỗi) và trả biểu thức SQL (chu�
 | `business_date` | `(ts_utc, tz)` | `to_date(from_utc_timestamp(ts_utc, 'tz'))` | `2025-03-14 18:00` UTC, VN ⇒ `2025-03-15` |
 | `date_key` | `(d)` | `coalesce(cast(date_format(d, 'yyyyMMdd') AS int), -1)` | |
 | `schema_drift` | `(delivery_columns, contract)` | Python: `(added, missing, missing_required)`; tên cột so không phân biệt hoa thường, đã trim | |
-| `conform_sql` | `(contract, silver_spec, dictionaries, future_order_days, source_view) -> str` | §3.3 | §3.3 |
+| `conform_sql` | `(contract, silver_spec, dictionaries, future_order_days, source_view, available_columns=None) -> str` | §3.3; `available_columns` (tên cột có trong view, đã trim, chữ thường): cột nguồn thiếu ⇒ NULL | §3.3 |
+| `lookup_expr` | `(c, mapping, cast_type)` | `CAST(CASE c WHEN 'Pending' THEN '1' … END AS type)`; khoá khớp đúng chữ (khác `std_dict`, vốn so theo `dict_key`) | `'Delivered'` ⇒ 4 với `STATUS_RANK` |
 
 ### 3.3 `conform_sql`
 

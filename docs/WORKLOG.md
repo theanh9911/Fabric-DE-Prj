@@ -135,3 +135,9 @@ Kiểm tra local: nạp `nb_contracts` + `nb_config` bằng Python thuần ⇒ "
 Kiểm chứng Fabric: chưa kiểm chứng (chưa chạy notebook trên Fabric).
 ## 2026-10-15 — T0.2 phạm vi còn lại
 Theo người dùng: chỉ K11c (ID động cho Connection) còn cần trước T3.3; K07 hoãn tới T6.1; K06 đã bỏ (D44).
+## 2026-10-15 — T2.2 nb_std — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Đã làm: `nb_std` mới (mọi hàm của 05 §3.2 và `conform_sql`). Literal chuỗi escape bằng `\'` (không dùng `''` vì Spark nối hai literal liền nhau thành chuỗi sai); `lookup:*` dùng `lookup_expr` khớp đúng chữ vì khoá `STATUS_RANK` là `Pending…`, không phải dạng `dict_key`.
+Tài liệu đã sửa: 05 §3.1, §3.2 (thêm `lookup_expr`, tham số `available_columns`).
+Kiểm tra local: `check_repo.py` (không có Spark/Java ở máy local nên không chạy SQL).
+Kiểm chứng Fabric: chưa kiểm chứng; `nb_test_unit` (T2.5) kiểm trên Spark.
