@@ -104,3 +104,9 @@ Người/agent: Claude (Sonnet 5.5), theo chỉ đạo người dùng: giả đ�
 - Tài liệu: 03 §4, 04 §7.2, §8 (R-ORD-05), §13 (DQ-SLV-05), 05 §2.3 (`flag_negative`), §3.3.
 Chưa xác nhận với owner nguồn: múi giờ retail (D41), định dạng thời gian file master (D43). E02b không cần chạy nữa.
 Kiểm chứng Fabric: không áp dụng (chỉ cấu hình và tài liệu).
+## 2026-10-15 — T0.2 lượt 3 (pl_spike: K08, K11a, K11b, K11d) — IN_PROGRESS
+Người/agent: Claude (Sonnet 5.5); chạy trên Fabric: anhnguyen
+Kết quả: K08 PASS (ForEach tuần tự, `isSequential` phải đặt tường minh); K11a, K11b, K11d PASS; chi tiết DECISIONS §3.
+Phát hiện thiết kế: Flatten hierarchy đổi tên file thành `data_<guid>.csv` ⇒ 04 §3.3 (khớp `expected_files` theo `(name, size)`) cần sửa sau khi thử Preserve hierarchy; staging cộng dồn nhiều lần chạy ⇒ thư mục staging theo `delivery_id`.
+Sự cố vận hành: nhánh `dev` remote đi trước (commit từ workspace Source) làm 5 lần push bị từ chối mà không báo; đã rebase và push lại, sau đó kiểm `git status -sb`. Binding `lh_platform` của `nb_spike` phải nằm trong Git, nếu không Update from Git gỡ mất.
+Còn lại: K11c, K11e, K06, K07, K12; thử Preserve hierarchy.
