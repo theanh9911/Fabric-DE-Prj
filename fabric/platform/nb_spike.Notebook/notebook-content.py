@@ -127,7 +127,8 @@ record("K03", k03)
 
 def k04():
     base = "Files/_spike"
-    notebookutils.fs.rm(base, True)
+    if notebookutils.fs.exists(base):
+        notebookutils.fs.rm(base, True)
     notebookutils.fs.put(f"{base}/staging/d1/part.txt", "x", True)
     ok = notebookutils.fs.mv(f"{base}/staging/d1", f"{base}/landing/b/s/e/run=d1", True)
     return {"mv_returned": ok,
@@ -215,7 +216,8 @@ record("K10", k10)
 # CELL ********************
 
 spark.sql("DROP SCHEMA IF EXISTS tst CASCADE")
-notebookutils.fs.rm("Files/_spike", True)
+if notebookutils.fs.exists("Files/_spike"):
+    notebookutils.fs.rm("Files/_spike", True)
 print(json.dumps(RESULTS, indent=2, ensure_ascii=False, default=str))
 
 # METADATA ********************
