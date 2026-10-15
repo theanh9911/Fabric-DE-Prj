@@ -68,7 +68,7 @@ Mỗi quyết định có ID cố định. Đổi một quyết định: thêm d
 | K05 Spark / ANSI / `try_to_timestamp` | PASS | Spark 4.1.1; `try_to_timestamp` có, `'abc'` ⇒ NULL. `spark.sql.ansi.enabled = false`: `sum(bigint)` tràn **quay vòng im lặng** (`9223372036854775807 + 1 = -9223372036854775808`) ⇒ checksum `decimal(38,0)` là bắt buộc. `CAST` hỏng cho NULL; vẫn dùng `try_cast` để không phụ thuộc cấu hình |
 | K06 pipeline `concurrency` | CHƯA CHẠY | cần `pl_spike` |
 | K07 activity Teams | CHƯA CHẠY | cần `pl_spike` |
-| K08 exit value trong expression | CHƯA CHẠY | cần `pl_spike` |
+| K08 exit value trong expression | PASS (9 phần tử, ~4,5 KB) | `@json(activity('nb').output.result.exitValue).sources` làm `items` của ForEach chạy đúng; mặc định ForEach **song song** (9 vòng cùng một giây, thứ tự lộn) ⇒ `pipeline-content.json` phải đặt `isSequential: true` tường minh; sau khi bật chạy `src0`…`src8` đúng thứ tự. Kích thước tối đa của exit value chưa đo (chỉ thử 9 phần tử) |
 | K09 `operationMetrics` | PASS có điều kiện | MERGE có `numTargetRowsInserted/Updated/Deleted`; `WRITE` có `numOutputRows`; **overwrite qua `saveAsTable` ghi `operation = 'CREATE OR REPLACE TABLE AS SELECT'`** (chỉ `numOutputRows`, không đếm dòng xoá); DELETE chỉ có `numDeletedRows`. Đã sửa 05 §4.6 `last_commit_metrics` theo `operation` |
 | K10 DDL `NOT NULL` + overwrite | PASS | overwrite `overwriteSchema=false` giữ `NOT NULL`; ghi NULL ⇒ `DeltaInvariantViolationException [DELTA_NOT_NULL_CONSTRAINT_VIOLATED]` kèm tên cột, bọc trong `Py4JJavaError` ⇒ bắt `Exception` và đọc mã trong thông điệp. Không cần kiểm NOT NULL trong `align_to_target` |
 | K11 Copy activity (DB → Parquet, file Binary + lọc last modified, ID động, `rowsRead`) | CHƯA CHẠY | cần `pl_spike` |
