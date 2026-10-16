@@ -46,23 +46,23 @@ Không bắt đầu pha kế tiếp khi mốc trước chưa được chứng mi
 | T0.4 | `pyproject.toml` + `tools/check_repo.py` | REVIEW | — |
 | T1.1 | `tools/build_contracts.py` + `nb_contracts` | REVIEW | T0.4 |
 | T1.2 | Hoàn thiện contract và từ điển theo EDA | REVIEW | T0.3, T1.1 |
-| T2.1 | `nb_config` | REVIEW | T1.2, T0.2 |
-| T2.2 | `nb_std` | REVIEW | T0.2 |
-| T2.3 | `nb_common` | REVIEW | T2.1, T2.2 |
-| T2.4 | `nb_setup_ddl` | REVIEW | T2.1 |
-| T2.5 | `nb_test_unit` | REVIEW | T2.3 |
-| T2.6 | Reset Dev | TODO | T2.4 |
-| T3.1 | `nb_plan` | REVIEW | T2.5, T2.6 |
-| T3.2 | `nb_land` | REVIEW | T3.1 |
-| T3.3 | `pl_master_daily` (khung: plan, ingest, close) + Connection | REVIEW | T3.2, T0.2 |
-| T3.4 | `nb_dq`, `nb_recon` (khung, contract check, RC-01) | REVIEW | T3.3 |
-| T4.1 | `nb_slv_orders` | REVIEW | T3.4 |
-| T4.2 | `nb_slv_master` | REVIEW | T3.4 |
+| T2.1 | `nb_config` | DONE | T1.2, T0.2 |
+| T2.2 | `nb_std` | DONE | T0.2 |
+| T2.3 | `nb_common` | DONE | T2.1, T2.2 |
+| T2.4 | `nb_setup_ddl` | DONE | T2.1 |
+| T2.5 | `nb_test_unit` | DONE | T2.3 |
+| T2.6 | Reset Dev | DONE | T2.4 |
+| T3.1 | `nb_plan` | DONE | T2.5, T2.6 |
+| T3.2 | `nb_land` | DONE | T3.1 |
+| T3.3 | `pl_master_daily` (khung: plan, ingest, close) + Connection | DONE | T3.2, T0.2 |
+| T3.4 | `nb_dq`, `nb_recon` (khung, contract check, RC-01) | DONE | T3.3 |
+| T4.1 | `nb_slv_orders` | REVIEW (full-load OK trên Dev, RC-02/03 PASS; chờ incremental) | T3.4 |
+| T4.2 | `nb_slv_master` | REVIEW (full-load OK, RC-04 PASS; chờ kịch bản 3 ngày) | T3.4 |
 | T5.1 | `nb_gld_dim_date` | REVIEW | T3.4 |
 | T5.2 | `nb_gld_dim_customer` | REVIEW | T4.1, T4.2 |
 | T5.3 | `nb_gld_dim_product` | REVIEW | T4.1, T4.2 |
 | T5.4 | `nb_gld_dim_salesman` | REVIEW | T4.1, T4.2 |
-| T5.5 | `nb_gld_fct_order_line` | REVIEW | T5.1–T5.4 |
+| T5.5 | `nb_gld_fct_order_line` | REVIEW (full-load OK, RC-05 PASS; chờ incremental) | T5.1–T5.4 |
 | T6.1 | Cảnh báo lỗi + `pl_backfill` | REVIEW (cảnh báo Teams chờ K07; hiện dùng activity Fail) | T5.5, T0.2 |
 | T6.2 | `nb_sla_watch` + `pl_sla_watch` | REVIEW | T6.1 |
 | T6.3 | `nb_maintenance` + `pl_maintenance` | REVIEW | T5.5 |
