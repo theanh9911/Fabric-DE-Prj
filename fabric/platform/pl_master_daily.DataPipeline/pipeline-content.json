@@ -144,7 +144,7 @@
                                 }
                               },
                               "externalReferences": {
-                                "connection": "00000000-0000-0000-0000-000000000000"
+                                "connection": "dcb5e64e-5190-4d92-878b-95072cbf9d91"
                               }
                             }
                           },
@@ -180,7 +180,7 @@
                                 "rootFolder": "Files"
                               },
                               "externalReferences": {
-                                "connection": "00000000-0000-0000-0000-000000000000"
+                                "connection": "94873c5f-283f-4da4-b9fa-7bfbf4ecfa18"
                               }
                             }
                           },
@@ -260,16 +260,8 @@
                       "source": {
                         "type": "BinarySource",
                         "storeSettings": {
-                          "type": "LakehouseReadSettings",
+                          "type": "AzureBlobStorageReadSettings",
                           "recursive": false,
-                          "wildcardFolderPath": {
-                            "value": "@item().source_folder",
-                            "type": "Expression"
-                          },
-                          "wildcardFileName": {
-                            "value": "@item().file_glob",
-                            "type": "Expression"
-                          },
                           "modifiedDatetimeStart": {
                             "value": "@item().modified_start",
                             "type": "Expression"
@@ -278,14 +270,22 @@
                             "value": "@item().modified_end",
                             "type": "Expression"
                           },
-                          "enablePartitionDiscovery": false
+                          "wildcardFolderPath": {
+                            "value": "@item().source_folder",
+                            "type": "Expression"
+                          },
+                          "wildcardFileName": {
+                            "value": "@item().file_glob",
+                            "type": "Expression"
+                          },
+                          "deleteFilesAfterCompletion": false
                         },
                         "formatSettings": {
                           "type": "BinaryReadSettings"
                         },
                         "datasetSettings": {
                           "annotations": [],
-                          "connectionSettings": {
+                          "linkedService": {
                             "name": "lh_retail_drop",
                             "properties": {
                               "annotations": [],
@@ -300,9 +300,6 @@
                                   "type": "Expression"
                                 },
                                 "rootFolder": "Files"
-                              },
-                              "externalReferences": {
-                                "connection": "00000000-0000-0000-0000-000000000000"
                               }
                             }
                           },
@@ -317,7 +314,7 @@
                       "sink": {
                         "type": "BinarySink",
                         "storeSettings": {
-                          "type": "LakehouseWriteSettings",
+                          "type": "AzureBlobStorageWriteSettings",
                           "copyBehavior": "PreserveHierarchy"
                         },
                         "datasetSettings": {
@@ -339,7 +336,7 @@
                                 "rootFolder": "Files"
                               },
                               "externalReferences": {
-                                "connection": "00000000-0000-0000-0000-000000000000"
+                                "connection": "94873c5f-283f-4da4-b9fa-7bfbf4ecfa18"
                               }
                             }
                           },

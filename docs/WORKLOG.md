@@ -159,3 +159,5 @@ Quyết định kỹ thuật cần biết:
 Kiểm tra local (không có Spark): `check_repo.py` OK (C01–C12); `preflight` và `plan_ingest` chạy bằng Python thuần với pyspark giả.
 Kiểm chứng Fabric: **chưa kiểm chứng** — toàn bộ notebook SQL/Spark và pipeline chưa chạy trên Fabric. Thứ tự: docs/07 §1.4.
 Chưa làm: cảnh báo Teams (K07, T6.1), Connection của Copy (người dùng gắn trong UI, ID Connection là placeholder `0000…`), T2.6 reset Dev (người chạy `nb_setup_ddl` với `p_reset`).
+## 2026-10-16 — Sửa Connection của pipeline (Git sync báo "User does not have access to the connection")
+ID Connection giữ chỗ `0000…` làm Fabric từ chối `pl_master_daily`. Đối chiếu với JSON `pl_spike` đã chạy: dùng ID Connection thật của SQL DB và `lh_platform` (ID tenant-level, ngoại lệ có chủ ý của W6). Phát hiện cấu trúc thật mà UI sinh ra, khác bản tôi tự viết: Copy file dùng `AzureBlobStorageReadSettings`/`AzureBlobStorageWriteSettings` và `linkedService` (không có `externalReferences`) cho drop zone; đã sửa theo. `InvokePipeline` của `pl_backfill` bỏ trường connection để không chặn sync (người dùng chọn trong UI nếu cần). Chưa kiểm chứng trên Fabric.
