@@ -738,7 +738,7 @@ def resolve_source_ids(workspace_name, erp_item, drop_lakehouse):
     import sempy.fabric as fabric
     try:
         ws = fabric.resolve_workspace_id(workspace_name)
-        erp = fabric.resolve_item_id(erp_item, None, ws)
+        erp = fabric.resolve_item_id(erp_item, "SQLDatabase", ws)  # cùng tên còn có item SQLEndpoint; Copy cần SQLDatabase
         drop = fabric.resolve_item_id(drop_lakehouse, "Lakehouse", ws)
     except Exception as e:  # noqa: BLE001
         raise ValueError(f"không tìm thấy workspace/item nguồn ({workspace_name}, {erp_item}, "
