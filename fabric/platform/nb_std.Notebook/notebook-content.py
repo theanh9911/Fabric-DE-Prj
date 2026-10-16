@@ -232,8 +232,8 @@ def conform_sql(contract, silver_spec, dictionaries, future_order_days, source_v
                        f"{int(future_order_days)}) THEN 'future_order_date' END")
     reject_expr = "coalesce(" + ", ".join(rejects) + ")" if rejects else "CAST(NULL AS STRING)"
 
-    # cờ FLAG
-    flags = ["CAST(NULL AS STRING)"]
+    # cờ FLAG: cờ dựa trên giá trị nguồn tính ở CTE c (nơi còn cột nguồn), cờ số âm tính ở r (trên cột canonical)
+    src_flags, neg_flags = [], []
     for c in cols:
         if c["std"].startswith("lookup:"):
             continue
@@ -242,15 +242,18 @@ def conform_sql(contract, silver_spec, dictionaries, future_order_days, source_v
         if src:
             present = f"{null_if_blank(_ident(src))} IS NOT NULL"
             if c.get("flag_reason"):
-                flags.append(f"CASE WHEN {n} IS NULL AND {present} THEN {_q(c['flag_reason'])} END")
+                cval = f"CAST({_std_expr(c, src, contract, dictionaries)} AS {c['type']})"
+                src_flags.append(f"CASE WHEN {cval} IS NULL AND {present} THEN {_q(c['flag_reason'])} END")
             if c["std"].startswith("dict:") and not c.get("required"):
                 mapped = std_dict(_ident(src), dictionaries[c["std"].split(":", 1)[1]])
-                flags.append(f"CASE WHEN {mapped} IS NULL AND {present} THEN 'unmapped_value' END")
+                src_flags.append(f"CASE WHEN {mapped} IS NULL AND {present} THEN 'unmapped_value' END")
             if c["std"] in ("date", "ts"):
-                flags.append(f"CASE WHEN {is_ambiguous_dm(_ident(src))} THEN 'ambiguous_date' END")
+                src_flags.append(f"CASE WHEN {is_ambiguous_dm(_ident(src))} THEN 'ambiguous_date' END")
         if c.get("flag_negative"):
-            flags.append(f"CASE WHEN {n} < 0 THEN {_q(c['flag_negative'])} END")
-    flags_expr = "array_compact(array(" + ", ".join(flags) + "))"
+            neg_flags.append(f"CASE WHEN {n} < 0 THEN {_q(c['flag_negative'])} END")
+    fl_names = [f"_fl{i}" for i in range(len(src_flags))]
+    c_items += [f"{e} AS {n}" for e, n in zip(src_flags, fl_names)]
+    flags_expr = "array_compact(array(" + ", ".join(["CAST(NULL AS STRING)"] + fl_names + neg_flags) + "))"
 
     # khoá và hash
     bk = "concat_ws('|', source_system, " + ", ".join(f"CAST({_ident(k)} AS STRING)" for k in silver_spec["business_keys"]) + ")"
@@ -258,16 +261,18 @@ def conform_sql(contract, silver_spec, dictionaries, future_order_days, source_v
     hash_cols = [n for n in names if n not in set(silver_spec["hash_exclude"]) and n not in raw_cols]
     r_items = [f"{reject_expr} AS _reject_reason", f"{flags_expr} AS _dq_flags", f"{bk} AS _bk",
                f"{record_hash(hash_cols)} AS _record_hash"]
+    out_cols = names + [c["keep_raw"] for c in cols if c.get("keep_raw")] + TECH_COLUMNS + [
+        "_reject_reason", "_dq_flags", "_bk", "_record_hash"]
     if silver_spec["kind"] == "event":
         ek = "concat_ws('|', source_system, " + ", ".join(f"CAST({_ident(k)} AS STRING)" for k in silver_spec["event_keys"]) + ")"
         r_items.append(f"sha2({ek}, 256) AS _event_key")
+        out_cols.append("_event_key")
 
     return (f"WITH s AS (SELECT {s_cols}, {tech} FROM {source_view}),\n"
             f"c AS (SELECT {', '.join(c_items)}, {tech} FROM s),\n"
             f"l AS (SELECT c.*{(', ' + ', '.join(l_items)) if l_items else ''} FROM c),\n"
             f"r AS (SELECT l.*, {', '.join(r_items)} FROM l)\n"
-            f"SELECT * FROM r")
-
+            f"SELECT {', '.join(_ident(c) for c in out_cols)} FROM r")
 
 # METADATA ********************
 
