@@ -135,9 +135,7 @@ def categories():
         SELECT category_code AS _cat_code, category_lvl1 AS category_l1, category_lvl2 AS category_l2,
                category_lvl3 AS category_l3, category_lvl4 AS category_l4,
                nullif(concat_ws('/', category_lvl1, category_lvl2, category_lvl3, category_lvl4), '') AS category_path
-        FROM (SELECT *, row_number() OVER (PARTITION BY category_code
-                                           ORDER BY _snapshot_date DESC, _delivered_at_utc DESC) AS _rn
-              FROM slv.v_categories_current WHERE NOT is_deleted) WHERE _rn = 1""")
+        FROM slv.v_categories_current WHERE NOT is_deleted""")
 
 
 def build(decision):
