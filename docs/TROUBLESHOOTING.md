@@ -63,3 +63,21 @@ F4 hoặc Trial có ít Spark compute; high concurrency giúp chia sẻ session 
 - Một phiên Spark mỗi lúc; xong thì dừng session.
 - `STARTED` trong `meta.run_log` mà không có kết thúc nghĩa là session chết hoặc bị dừng; nguyên nhân nằm trong Monitoring hub, không phải trong `meta`.
 - Không sửa tay bảng `meta` hoặc `ctl` trên Fabric: cấu hình sửa trong code và sync; audit do notebook ghi.
+
+## Bài học khi viết code (rà trước khi push)
+
+Mỗi dòng là một lỗi đã xảy ra ở lần chạy đầu trên Fabric (2026-10-16). Không có Spark local nên các lỗi này chỉ lộ khi chạy; rà các mục này trước khi đưa code mới lên.
+
+| Chủ đề | Quy tắc | Lỗi đã gặp |
+|---|---|---|
+| Tên cột dành riêng | bảng bật CDF không được có cột `_change_type`, `_commit_version`, `_commit_timestamp` | `DELTA_TABLE_ALREADY_CONTAINS_CDC_COLUMNS` ⇒ cột history đổi thành `_change_kind` |
+| CTE nhiều tầng | cột nguồn chỉ tồn tại ở tầng đọc nguồn; tầng sau chỉ có cột đã chọn. Cờ dựa trên giá trị nguồn phải tính ở tầng còn cột nguồn | `UNRESOLVED_COLUMN created_at` trong `conform_sql` |
+| Escape regex | chuỗi Python chỉ chứa một `\d`, để `_q()` escape đúng một lần. Ngược lại, biểu thức viết thẳng (không qua `_q`) cần `\\s` | `1,234.5` không parse được, `3/4/2025` không bị coi là mơ hồ |
+| Biểu thức pipeline | chỉ một `@` ở đầu; bên trong dùng `coalesce(json(...).x, '')` không có `@` | `InvalidTemplate ... '@' is not expected` |
+| Tách cột từ DDL | bỏ chú thích `--` và đếm cả `<>` trước khi tách theo dấu phẩy | bước kiểm cột của `nb_setup_ddl` báo lệch giả |
+| `CREATE ... IF NOT EXISTS` | bảng cũ cùng tên bị bỏ qua lặng lẽ; `nb_setup_ddl` đã có bước so cột và báo cần `p_reset` | view tạo lỗi vì bảng v1 còn sót |
+| Hai item cùng tên | SQL Database có thêm item `SQLEndpoint` cùng tên (ID khác); luôn tra ID kèm loại (`SQLDatabase`, `Lakehouse`) | Copy `ItemNotFound` với `ArtifactId` của SQLEndpoint |
+| Cấu trúc JSON Copy | lấy mẫu từ JSON mà UI sinh ra (`AzureBlobStorageReadSettings`, `linkedService`), không tự suy; ID Connection thật nằm ở `externalReferences.connection` và phải hợp lệ khi Git sync | `User does not have access to the connection` khi Update from Git |
+| Capacity | mỗi Notebook activity mở một Spark session; trial dễ gặp 430 giữa pipeline. Lỗi trước khi `nb_land` chạy thì không có dòng `run_log` | `land_file` Failed 430, `run_log` không có `ingest.*` |
+| MERGE không đổi gì | có thể không tạo commit ⇒ so version trước và sau khi lấy số liệu | số liệu MERGE lấy nhầm commit cũ |
+| Kiểm tra local | compile và smoke test chuỗi SQL không phát hiện lỗi tham chiếu cột hay hành vi Spark; chỉ chạy Spark mới lộ | nhiều lỗi ở trên |
