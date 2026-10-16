@@ -595,7 +595,7 @@ def test_snapshot__changes_full():
                    ("w", "B", "h2", "2026-01-03"),
                    ("w", "A", "h1", "2026-01-04"), ("w", "B", "h2", "2026-01-04")])
     out = snapshot_changes(snaps, snaps.limit(0), ["k"])
-    got = sorted((r["k"], str(r["_snapshot_date"]), r["_change_type"], r["is_deleted"]) for r in out.collect())
+    got = sorted((r["k"], str(r["_snapshot_date"]), r["_change_kind"], r["is_deleted"]) for r in out.collect())
     want = sorted([("A", "2026-01-01", "INSERT", False), ("B", "2026-01-01", "INSERT", False),
                    ("B", "2026-01-02", "UPDATE", False), ("A", "2026-01-03", "DELETE", True),
                    ("A", "2026-01-04", "REINSERT", False)])
@@ -608,7 +608,7 @@ def test_snapshot__changes_incremental():
         "source_system string, k string, _record_hash string, is_deleted boolean, _snapshot_date date")
     snaps = _snap([("w", "A", "h1", "2026-01-05")])
     out = snapshot_changes(snaps, prev, ["k"])
-    got = sorted((r["k"], str(r["_snapshot_date"]), r["_change_type"]) for r in out.collect())
+    got = sorted((r["k"], str(r["_snapshot_date"]), r["_change_kind"]) for r in out.collect())
     assert got == [("B", "2026-01-05", "DELETE")], f"A không đổi, B vắng ⇒ DELETE: {got}"
 
 

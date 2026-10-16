@@ -510,7 +510,7 @@ obs AS (SELECT *, lag(_record_hash) OVER w AS _prev_hash, lag(is_deleted) OVER w
                lag(_seq) OVER w AS _prev_seq, lead(_seq) OVER w AS _next_seq
         FROM obs0 WINDOW w AS (PARTITION BY source_system, {keys} ORDER BY _seq)),
 upserts AS (SELECT *, CASE WHEN _prev_hash IS NULL THEN 'INSERT'
-                           WHEN _prev_deleted OR _seq > _prev_seq + 1 THEN 'REINSERT' ELSE 'UPDATE' END AS _change_type
+                           WHEN _prev_deleted OR _seq > _prev_seq + 1 THEN 'REINSERT' ELSE 'UPDATE' END AS _change_kind
             FROM obs
             WHERE _is_prev = 0 AND (_prev_hash IS NULL OR _prev_deleted OR _seq > _prev_seq + 1
                                     OR _record_hash <> _prev_hash)),
@@ -519,9 +519,9 @@ deletes AS (SELECT o.*, d2._snapshot_date AS _deleted_on
             JOIN dates d2 ON d2.source_system = o.source_system AND d2._dseq = o._seq + 1
             WHERE NOT o.is_deleted AND o._seq < m._max_seq
               AND (o._next_seq IS NULL OR o._next_seq > o._seq + 1))
-SELECT {sel}, _change_type FROM upserts
+SELECT {sel}, _change_kind FROM upserts
 UNION ALL
-SELECT {del_sel}, 'DELETE' AS _change_type FROM deletes
+SELECT {del_sel}, 'DELETE' AS _change_kind FROM deletes
 """
     return spark.sql(sql)
 

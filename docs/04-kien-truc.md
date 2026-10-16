@@ -398,14 +398,14 @@ Worker Gold **không** đọc view này: nó lấy các sự kiện của khoá 
 
 Grain: một **thay đổi** của một thực thể ở một nguồn. Khoá `(source_system, <key>, _snapshot_date)`. Có dòng khi: thực thể xuất hiện lần đầu (`INSERT`), `_record_hash` khác phiên bản trước (`UPDATE`), thực thể vắng mặt ở snapshot sau (`DELETE`, `is_deleted = true`), xuất hiện lại sau khi bị xoá (`REINSERT`).
 
-Cột thêm cho mọi bảng history: `is_deleted BOOLEAN NOT NULL`, `_snapshot_date DATE NOT NULL`, `_change_type STRING NOT NULL`. Cột kỹ thuật như §5.1 trừ `_event_key`.
+Cột thêm cho mọi bảng history: `is_deleted BOOLEAN NOT NULL`, `_snapshot_date DATE NOT NULL`, `_change_kind STRING NOT NULL` (không dùng `_change_type`: tên dành riêng của Delta Change Data Feed, bảng có cột này không bật được CDF). Cột kỹ thuật như §5.1 trừ `_event_key`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS slv.customers_history (
   source_system STRING NOT NULL, customer_code STRING NOT NULL,
   customer_name STRING, country STRING, city STRING, gender STRING, gender_raw STRING, address STRING,
   created_at_utc TIMESTAMP, updated_at_utc TIMESTAMP,
-  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_type STRING NOT NULL,
+  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_kind STRING NOT NULL,
   _bk STRING NOT NULL, _record_hash STRING NOT NULL,
   _batch_id STRING NOT NULL, _delivery_id STRING NOT NULL, _delivered_at_utc TIMESTAMP NOT NULL,
   _source_file STRING, _row_no BIGINT, _dq_flags ARRAY<STRING>,
@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS slv.products_history (
   source_system STRING NOT NULL, product_code STRING NOT NULL,
   product_name STRING, brand STRING, brand_raw STRING, category_code STRING,
   created_at_utc TIMESTAMP, updated_at_utc TIMESTAMP,
-  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_type STRING NOT NULL,
+  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_kind STRING NOT NULL,
   _bk STRING NOT NULL, _record_hash STRING NOT NULL,
   _batch_id STRING NOT NULL, _delivery_id STRING NOT NULL, _delivered_at_utc TIMESTAMP NOT NULL,
   _source_file STRING, _row_no BIGINT, _dq_flags ARRAY<STRING>,
@@ -428,7 +428,7 @@ CREATE TABLE IF NOT EXISTS slv.sales_hierarchy_history (
   salesman_name STRING, division STRING, position STRING, position_raw STRING,
   salesmanager_code STRING, salesmanager_name STRING,
   created_at_utc TIMESTAMP, updated_at_utc TIMESTAMP,
-  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_type STRING NOT NULL,
+  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_kind STRING NOT NULL,
   _bk STRING NOT NULL, _record_hash STRING NOT NULL,
   _batch_id STRING NOT NULL, _delivery_id STRING NOT NULL, _delivered_at_utc TIMESTAMP NOT NULL,
   _source_file STRING, _row_no BIGINT, _dq_flags ARRAY<STRING>,
@@ -438,7 +438,7 @@ CREATE TABLE IF NOT EXISTS slv.sales_hierarchy_history (
 CREATE TABLE IF NOT EXISTS slv.categories_history (
   source_system STRING NOT NULL, category_code STRING NOT NULL,
   category_lvl1 STRING, category_lvl2 STRING, category_lvl3 STRING, category_lvl4 STRING,
-  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_type STRING NOT NULL,
+  is_deleted BOOLEAN NOT NULL, _snapshot_date DATE NOT NULL, _change_kind STRING NOT NULL,
   _bk STRING NOT NULL, _record_hash STRING NOT NULL,
   _batch_id STRING NOT NULL, _delivery_id STRING NOT NULL, _delivered_at_utc TIMESTAMP NOT NULL,
   _source_file STRING, _row_no BIGINT, _dq_flags ARRAY<STRING>,

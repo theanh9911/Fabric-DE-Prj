@@ -100,7 +100,7 @@ RUN_ID = p_run_id or new_id()
 MODE = p_mode or "normal"
 KEYS = SPEC["business_keys"]
 PAIRS = [(c["source_system"], c["entity"]) for c in contracts_for_silver(TARGET)]
-HIST_COLS = [c for c in spark.table(TARGET).columns if c != "_change_type"]
+HIST_COLS = [c for c in spark.table(TARGET).columns if c != "_change_kind"]
 
 
 def pick_deliveries(decision):

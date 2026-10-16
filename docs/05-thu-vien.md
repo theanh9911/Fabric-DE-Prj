@@ -364,7 +364,7 @@ Quy ước chung:
 
 ### 4.9 `snapshot_changes(snapshots, previous, key_cols)`
 
-`snapshots`: các snapshot mới đã conform và dedupe, có `source_system`, `_snapshot_date`, `_record_hash`, `is_deleted` (= false) và mọi cột của bảng history trừ `_change_type`. `previous`: `v_<entity>_current` (incremental) hoặc rỗng (full). Trả các dòng thay đổi kèm `is_deleted`, `_change_type`, không gồm dòng của `previous`.
+`snapshots`: các snapshot mới đã conform và dedupe, có `source_system`, `_snapshot_date`, `_record_hash`, `is_deleted` (= false) và mọi cột của bảng history trừ `_change_kind`. `previous`: `v_<entity>_current` (incremental) hoặc rỗng (full). Trả các dòng thay đổi kèm `is_deleted`, `_change_kind`, không gồm dòng của `previous`.
 
 Thứ tự (`_seq`) chỉ tính trên ngày của **snapshot mới**; dòng của `previous` có `_seq = 0`. Lý do: history chỉ chứa thay đổi, nên ngày của `previous` không cho biết khoá có mặt hay vắng ở snapshot trung gian; chỉ các snapshot mới là danh sách đầy đủ.
 
@@ -381,7 +381,7 @@ obs AS (SELECT *, lag(_record_hash) OVER w AS _prev_hash, lag(is_deleted) OVER w
                lag(_seq) OVER w AS _prev_seq, lead(_seq) OVER w AS _next_seq
         FROM obs0 WINDOW w AS (PARTITION BY source_system, <keys> ORDER BY _seq)),
 upserts AS (SELECT *, CASE WHEN _prev_hash IS NULL THEN 'INSERT'
-                           WHEN _prev_deleted OR _seq > _prev_seq + 1 THEN 'REINSERT' ELSE 'UPDATE' END AS _change_type
+                           WHEN _prev_deleted OR _seq > _prev_seq + 1 THEN 'REINSERT' ELSE 'UPDATE' END AS _change_kind
             FROM obs
             WHERE _is_prev = 0 AND (_prev_hash IS NULL OR _prev_deleted OR _seq > _prev_seq + 1
                                     OR _record_hash <> _prev_hash)),
@@ -390,9 +390,9 @@ deletes AS (SELECT o.*, d2._snapshot_date AS _deleted_on
             JOIN dates d2 ON d2.source_system = o.source_system AND d2._dseq = o._seq + 1
             WHERE NOT o.is_deleted AND o._seq < m._max_seq
               AND (o._next_seq IS NULL OR o._next_seq > o._seq + 1))
-SELECT <cột>, _change_type FROM upserts
+SELECT <cột>, _change_kind FROM upserts
 UNION ALL
-SELECT <cột, với is_deleted = true và _snapshot_date = _deleted_on>, 'DELETE' AS _change_type FROM deletes
+SELECT <cột, với is_deleted = true và _snapshot_date = _deleted_on>, 'DELETE' AS _change_kind FROM deletes
 ```
 Test: 3 snapshot (S1: A, B; S2: A, B đã sửa; S3: B, rồi S4: A, B) ⇒ INSERT A, INSERT B (S1), UPDATE B (S2), DELETE A (S3), REINSERT A (S4). Incremental: `previous` có A (S1), B (S2); snapshot mới S5 chỉ có A không đổi ⇒ DELETE B tại S5.
 ### 4.10 Trạng thái và quyết định chạy

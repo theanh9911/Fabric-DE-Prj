@@ -194,7 +194,7 @@ def test_scenario_org_change():
     n = scalar(f"SELECT count(*) FROM gld.dim_salesman WHERE salesman_code = '{code}' AND source_system = 'wholesale'")
     assert n >= 2, f"{code} chỉ có {n} phiên bản"
     assert scalar(f"SELECT count(*) FROM slv.sales_hierarchy_history WHERE salesman_code = '{code}' "
-                  "AND _change_type = 'UPDATE'") >= 1
+                  "AND _change_kind = 'UPDATE'") >= 1
 
 
 def test_scenario_master_delete():
@@ -203,7 +203,7 @@ def test_scenario_master_delete():
     entity = r["entity"].split(".", 1)[1]
     col = {"products": "product_code", "customers": "customer_code",
            "sales_hierarchy": "salesman_code", "categories": "category_code"}[entity]
-    n = scalar(f"SELECT count(*) FROM slv.{entity}_history WHERE {col} = '{key}' AND _change_type = 'DELETE'")
+    n = scalar(f"SELECT count(*) FROM slv.{entity}_history WHERE {col} = '{key}' AND _change_kind = 'DELETE'")
     assert n >= 1, f"không có dòng DELETE cho {key}"
 
 

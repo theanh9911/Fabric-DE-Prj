@@ -185,7 +185,7 @@ SELECT * FROM slv.orders_event WHERE order_no = '<order_no>' ORDER BY product_co
 ```
 **Q10 — loại thay đổi master**
 ```sql
-SELECT source_system, _snapshot_date, _change_type, count(*) FROM slv.<entity>_history
+SELECT source_system, _snapshot_date, _change_kind, count(*) FROM slv.<entity>_history
 GROUP BY ALL ORDER BY 2, 1, 3;
 ```
 **Q11 — lịch sử một mã master**
