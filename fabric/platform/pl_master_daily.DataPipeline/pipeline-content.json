@@ -427,14 +427,14 @@
             },
             "p_load_date": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date, '')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).load_date, '')",
                 "type": "Expression"
               },
               "type": "string"
             },
             "p_load_date_to": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date_to, '')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).load_date_to, '')",
                 "type": "Expression"
               },
               "type": "string"
@@ -503,14 +503,14 @@
                   },
                   "p_load_date": {
                     "value": {
-                      "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date, '')",
+                      "value": "@coalesce(json(activity('plan').output.result.exitValue).load_date, '')",
                       "type": "Expression"
                     },
                     "type": "string"
                   },
                   "p_load_date_to": {
                     "value": {
-                      "value": "@coalesce(@json(activity('plan').output.result.exitValue).load_date_to, '')",
+                      "value": "@coalesce(json(activity('plan').output.result.exitValue).load_date_to, '')",
                       "type": "Expression"
                     },
                     "type": "string"
@@ -798,14 +798,14 @@
             },
             "p_batch_id": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).batch_id, '')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).batch_id, '')",
                 "type": "Expression"
               },
               "type": "string"
             },
             "p_check_scope": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).check_scope, 'daily')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).check_scope, 'daily')",
                 "type": "Expression"
               },
               "type": "string"
@@ -842,14 +842,14 @@
             },
             "p_batch_id": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).batch_id, '')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).batch_id, '')",
                 "type": "Expression"
               },
               "type": "string"
             },
             "p_check_scope": {
               "value": {
-                "value": "@coalesce(@json(activity('plan').output.result.exitValue).check_scope, 'daily')",
+                "value": "@coalesce(json(activity('plan').output.result.exitValue).check_scope, 'daily')",
                 "type": "Expression"
               },
               "type": "string"
