@@ -72,7 +72,7 @@ def parse_date(c, formats):
 
 def is_ambiguous_dm(c):
     x = null_if_blank(c)
-    pat = _q("^(\\\\d{1,2})/(\\\\d{1,2})/(\\\\d{4})")
+    pat = _q("^(\\d{1,2})/(\\d{1,2})/(\\d{4})")
     a = f"CAST(regexp_extract({x}, {pat}, 1) AS INT)"
     b = f"CAST(regexp_extract({x}, {pat}, 2) AS INT)"
     return f"coalesce(({x} RLIKE {pat} AND {a} <= 12 AND {b} <= 12 AND {a} <> {b}), false)"
@@ -80,7 +80,7 @@ def is_ambiguous_dm(c):
 
 def parse_decimal(c):
     x = null_if_blank(c)
-    thousands = _q("^-?\\\\d{1,3}(,\\\\d{3})+(\\\\.\\\\d+)?$")
+    thousands = _q("^-?\\d{1,3}(,\\d{3})+(\\.\\d+)?$")
     return (f"try_cast(CASE WHEN {x} RLIKE {thousands} THEN regexp_replace({x}, ',', '') ELSE {x} END "
             f"AS DECIMAL(18,2))")
 
