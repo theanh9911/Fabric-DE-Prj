@@ -100,7 +100,7 @@ def rc(check_id, delivery_or_obj, a, b, severity, message, scope_value=None):
 
 def rc01():
     """Nguồn ↔ Landing (DB): rowsRead của Copy so với số dòng đếm lại ở Landing."""
-    for d in deliveries_of_run(RUN_ID, ("LANDED",), table="meta.delivery_log"):
+    for d in deliveries_to_reconcile("RC-01", ("LANDED",), table="meta.delivery_log"):
         if not str(d["load_strategy"]).startswith("db_"):
             continue
         n = spark.read.parquet(d["landing_path"]).count()
@@ -111,7 +111,7 @@ def rc01():
 
 def rc02_rc03():
     spec = get_silver("slv.orders_event")
-    for d in deliveries_of_run(RUN_ID, ("LOADED",)):
+    for d in deliveries_to_reconcile("RC-02", ("LOADED",)):
         if f"{d['source_system']}.{d['entity']}" not in {c["id"] for c in contracts_for_silver("slv.orders_event")}:
             continue
         conf = conform_delivery(d, spec).persist()
@@ -131,7 +131,7 @@ def rc02_rc03():
 
 def rc04():
     latest = {}
-    for d in deliveries_of_run(RUN_ID, ("LOADED",)):
+    for d in deliveries_to_reconcile("RC-04", ("LOADED",), latest_per_key=True):
         tbl = next((c["silver_table"] for c in active_contracts()
                     if c["source_system"] == d["source_system"] and c["entity"] == d["entity"]), None)
         if tbl is None or get_silver(tbl)["kind"] != "snapshot" or tbl not in ACTIVE:

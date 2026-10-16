@@ -919,7 +919,7 @@ Thông tin lượt lỗi ở đâu: Monitor (activity nào Failed), `meta.v_run_
 | Notebook | Tham số | Kết quả |
 |---|---|---|
 | `nb_dq` | `p_run_id`, `p_batch_id`, `p_check_scope` | đọc delivery và bảng của lượt từ `meta`; ghi `meta.check_result`; có critical FAIL ⇒ raise sau khi ghi hết; ngược lại `{"contract": 1, "status": "SUCCEEDED", "checks": n, "warnings": n}` |
-| `nb_recon` | như `nb_dq` | như `nb_dq`; RC-01 đến RC-04 theo delivery của lượt; RC-05 trên toàn bảng |
+| `nb_recon` | như `nb_dq` | như `nb_dq`; RC-01 đến RC-04 theo delivery chưa có kết quả đối soát (không FAIL), kể cả delivery của lượt trước đã lỗi giữa chừng; RC-05 trên toàn bảng |
 | `nb_close` | `p_run_id`, `p_status`, `p_error` | ghi `run_log` (`step = pipeline`, `event = p_status`, `error_message = p_error`) |
 | `nb_sla_watch` | `p_load_date` (trống ⇒ hôm qua giờ VN) | ghi DQ-OPS-01; `{"late_sources": [{"source_id", "owner", "support_channel"}]}` |
 | `nb_maintenance` | không | ghi `run_log` (`layer = maint`); `{"optimized": [...], "vacuumed": [...]}` |
@@ -1025,7 +1025,7 @@ Hai số của mỗi phép so được tính từ hai nơi độc lập (N8). Ch
 | RC-01 | nguồn ↔ Landing (DB) | `source_count`: `rowsRead` do Copy activity báo | `rows_landed`: đếm lại Parquet ở Landing | `db_incremental` critical; `db_full_snapshot` warning |
 | RC-02 | Landing ↔ Silver, orders | dòng đọc lại từ Landing của delivery, conform lại, không REJECT ⇒ tập `_event_key` | anti-join với `slv.orders_event` ⇒ số khoá thiếu, phải = 0 | critical |
 | RC-03 | Landing ↔ quarantine | số dòng REJECT khi conform lại delivery | số dòng `action = REJECT` của delivery trong `slv.quarantine` | critical |
-| RC-04 | Landing ↔ Silver, master | snapshot mới nhất của lượt (conform lại, dedupe) | `v_<entity>_current` của source đó: số khoá lệch `_record_hash` + số khoá có ở current mà không ở snapshot nhưng chưa `is_deleted`, phải = 0 | critical |
+| RC-04 | Landing ↔ Silver, master | snapshot mới nhất chưa đối soát (conform lại, dedupe) | `v_<entity>_current` của source đó: số khoá lệch `_record_hash` + số khoá có ở current mà không ở snapshot nhưng chưa `is_deleted`, phải = 0 | critical |
 | RC-05 | Silver ↔ Gold | `count(*)`, `sum(quantity * price)` của `slv.v_orders_current` | cùng phép tính trên `gld.fct_order_line` | critical |
 | RC-06 | (Dev) simulator ↔ Landing | `sim_release_log.rows_released` theo cửa sổ | `rows_landed` theo batch | warning; chỉ `nb_test_e2e` |
 

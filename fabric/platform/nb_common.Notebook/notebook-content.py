@@ -1165,6 +1165,24 @@ def deliveries_of_run(run_id, statuses=("LANDED", "LOADED"), table="meta.v_deliv
     return [r.asDict() for r in rows]
 
 
+def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False):
+    """Delivery chưa có kết quả đối soát `check_id` (không FAIL), bất kể thuộc lượt nào: lượt chạy lại sau lỗi
+    có `run_id` mới nên không thấy delivery của lượt lỗi. `latest_per_key`: chỉ delivery mới nhất của mỗi
+    (source_system, entity), chọn trước khi loại các delivery đã đối soát."""
+    st = ", ".join(f"'{x}'" for x in statuses)
+    keep = "WHERE _rk = 1" if latest_per_key else ""
+    rows = spark.sql(
+        f"WITH d AS (SELECT *, row_number() OVER (PARTITION BY source_system, entity "
+        f"ORDER BY snapshot_date DESC NULLS LAST, delivered_at_utc DESC) AS _rk FROM {safe_table_name(table)} "
+        f"WHERE status IN ({st})) "
+        f"SELECT d.*, date_format(delivered_at_utc, 'yyyy-MM-dd HH:mm:ss.SSSSSS') AS delivered_at_str, "
+        f"date_format(snapshot_date, 'yyyy-MM-dd') AS snapshot_date_str FROM d {keep} "
+        f"{'AND' if latest_per_key else 'WHERE'} NOT EXISTS (SELECT 1 FROM meta.check_result c "
+        f"WHERE c.source = 'recon' AND c.check_id = '{check_id}' AND c.scope_value = d.delivery_id "
+        f"AND c.status <> 'FAIL') ORDER BY source_system, entity, delivered_at_utc").collect()
+    return [r.asDict() for r in rows]
+
+
 def conform_master(delivery, silver_spec):
     """Conform một snapshot master: R-MST-01 (trùng khoá ⇒ giữ `_row_no` nhỏ nhất, dòng còn lại FLAG
     `duplicate_key_in_snapshot` và `_is_dup`), `self_manager` cho sales_hierarchy."""
