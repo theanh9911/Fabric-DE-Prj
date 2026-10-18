@@ -149,7 +149,7 @@ def build(decision):
         F.count(F.lit(1)).alias("n"), F.sum(F.when(rej, 1).otherwise(0)).alias("rejected"),
         F.sum(F.when(~rej & (F.size(F.coalesce("_dq_flags", F.array().cast("array<string>"))) > 0), 1)
               .otherwise(0)).alias("flagged")).collect()}
-    n_reject, n_flag = quarantine_rows(conf, SPEC["entity"], RUN_ID)
+    n_reject, n_flag = quarantine_rows(conf, SPEC["entity"], RUN_ID, replace=full)
     snaps = (conf.where(~rej & ~F.col("_is_dup")).withColumn("is_deleted", F.lit(False)).select(*HIST_COLS))
     if full:
         previous = spark.table(TARGET).limit(0)

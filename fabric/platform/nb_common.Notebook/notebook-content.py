@@ -463,10 +463,16 @@ def quarantine_frame(df, entity, run_id):
     return rejects.unionByName(flags).dropDuplicates(_QUARANTINE_KEY)
 
 
-def quarantine_rows(df, entity, run_id, table="slv.quarantine"):
+def quarantine_rows(df, entity, run_id, table="slv.quarantine", replace=False):
+    """`replace` (dựng lại hoàn toàn): quarantine là dữ liệu dẫn xuất từ Landing nên dòng cũ của các delivery trong
+    `df` bị thay bằng dòng tính lại; nếu không, đổi logic rồi dựng lại sẽ để lại dòng không còn đúng."""
     q = quarantine_frame(df, entity, run_id).persist()
     n_reject = q.where("action = 'REJECT'").count()
     n_flag = q.where("action = 'FLAG'").count()
+    if replace:
+        ids = ", ".join(f"'{r[0]}'" for r in df.select("_delivery_id").distinct().collect())
+        if ids:
+            spark.sql(f"DELETE FROM {safe_table_name(table)} WHERE entity = '{entity}' AND delivery_id IN ({ids})")
     if n_reject + n_flag:
         merge_insert_only(table, q, _QUARANTINE_KEY)
     q.unpersist()
@@ -956,8 +962,8 @@ def unchecked_run_ids(run_id):
 
 
 def source_delivered(c, batch_id):
-    """Nguồn đã giao cho batch: có delivery LANDED/LOADED, hoặc lần ingest báo UNCHANGED / zero_rows (nguồn giao đủ,
-    chỉ là không có gì mới). File không tới (no_staging_files, plan_mismatch) thì chưa giao."""
+    """Nguồn đã giao cho batch: có delivery LANDED/LOADED, hoặc lần ingest báo UNCHANGED / zero_rows / up_to_date
+    (nguồn giao đủ, chỉ là không có gì mới). File không tới (no_staging_files, plan_mismatch) thì chưa giao."""
     n = spark.sql(
         "SELECT count(*) AS n FROM meta.v_delivery_state WHERE status IN ('LANDED', 'LOADED') "
         f"AND source_system = '{c['source_system']}' AND entity = '{c['entity']}' "
@@ -966,7 +972,8 @@ def source_delivered(c, batch_id):
         return True
     return spark.sql(
         f"SELECT count(*) AS n FROM meta.run_log WHERE step = 'ingest.{c['id']}' AND batch_from = '{batch_id}' "
-        "AND (event = 'UNCHANGED' OR (event = 'NO_DATA' AND reason = 'zero_rows'))").collect()[0]["n"] > 0
+        "AND (event = 'UNCHANGED' OR (event = 'NO_DATA' AND reason IN ('zero_rows', 'up_to_date')))"
+        ).collect()[0]["n"] > 0
 
 
 def _where(spec, run_ids, *conds, alias=""):

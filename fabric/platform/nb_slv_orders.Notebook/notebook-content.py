@@ -126,7 +126,7 @@ def build(decision):
         F.count(F.lit(1)).alias("n"), F.sum(F.when(rej, 1).otherwise(0)).alias("rejected"),
         F.sum(F.when(~rej & (F.size(F.coalesce("_dq_flags", F.array().cast("array<string>"))) > 0), 1)
               .otherwise(0)).alias("flagged")).collect()}
-    n_reject, n_flag = quarantine_rows(conf, ENTITY, RUN_ID)
+    n_reject, n_flag = quarantine_rows(conf, ENTITY, RUN_ID, replace=full)
     w = Window.partitionBy("_event_key").orderBy(F.col("_delivered_at_utc").desc(), F.col("_row_no").desc())
     acc = (conf.where(~rej).withColumn("_rn", F.row_number().over(w)).where("_rn = 1")
            .drop("_rn", *DROP_COLS))

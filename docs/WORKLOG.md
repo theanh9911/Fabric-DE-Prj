@@ -204,3 +204,10 @@ Phát hiện: lượt `rerun` + `p_full_reload` chỉ cho `checks: 2` (RC-05). `
 Cũng ghi lại: hướng dẫn tham số lượt dựng lại trước đó sai hai lần (PF04, PF05). Đúng: `p_mode=rerun`, `p_full_reload=true`, `p_load_date` và `p_load_date_to` để trống (04 §11.3).
 File: nb_common, nb_recon. Tài liệu: 04 §10.9, 05 §4.13.
 Kiểm chứng Fabric: chưa kiểm chứng. Lần `recon` đã SUCCEEDED sau lượt dựng lại trước nên không còn thấy lần dựng đó; cần chạy lại lượt dựng lại một lần nữa, kỳ vọng recon > 2 check (RC-02 đến RC-04 cho mọi delivery) và RC-03 PASS.
+## 2026-10-18 — Đính chính sau desk-check lượt dựng lại (chưa kiểm chứng Fabric) — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Rà code theo đường đi của lượt `rerun` + `p_full_reload` trước khi chạy Fabric, tìm thêm hai lỗi:
+- `source_delivered` (mục 2026-10-18 trước) chỉ nhận `NO_DATA` `zero_rows`, trong khi `wholesale.orders` ghi `NO_DATA` `up_to_date` (watermark đã vượt cửa sổ, `plan_ingest`): vẫn báo trễ giả. Nay nhận cả `up_to_date`.
+- `quarantine_rows` chỉ chèn thêm: dựng lại hoàn toàn sẽ nhân đôi dòng REJECT của delivery đã có dòng cũ (Dev còn dòng do code trước D1) và RC-03 FAIL; đổi logic rồi dựng lại cũng để lại dòng cũ sai. Nay `quarantine_rows(..., replace=True)` (Silver orders/master khi `full`) xoá dòng cũ của các delivery được dựng lại rồi chèn dòng tính lại; đóng thủ công của các delivery đó mất.
+Sửa: nb_common, nb_slv_orders, nb_slv_master, nb_test_unit (thêm bước replace vào test quarantine). Tài liệu: 04 §7.2, §13; 05 §4.8, §4.13.
+Kiểm chứng Fabric: chưa kiểm chứng. Cần Update all, `nb_test_unit`, rồi lượt dựng lại (`rerun`, `p_full_reload=true`, ngày để trống): kỳ vọng recon RC-01..05 đầy đủ, RC-03 PASS, `slv.quarantine` không còn dòng trùng.

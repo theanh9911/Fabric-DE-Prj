@@ -645,6 +645,9 @@ def test_quarantine__reject_flag_resolve():
     resolve_quarantine("dl1", "run4", table=t)
     assert spark.table(t).where("resolved_at_utc IS NULL AND action = 'REJECT'").count() == 0
     assert spark.table(t).where("action = 'FLAG' AND resolved_at_utc IS NULL").count() == 1, "FLAG không bị đóng"
+    fixed = _qdf([("r", "20260101", "dl1", "r|O1|P1", None, [], d1, 1, "x")], "run5")
+    quarantine_rows(fixed, "orders", "run5", table=t, replace=True)
+    assert spark.table(t).where("delivery_id = 'dl1'").count() == 0, "dựng lại phải thay dòng cũ của delivery"
 
 # METADATA ********************
 

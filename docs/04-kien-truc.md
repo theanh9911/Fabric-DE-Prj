@@ -590,7 +590,7 @@ Khoá chống ghi trùng: `(entity, delivery_id, business_key, reason, row_json)
 
 - Một dòng có nhiều lỗi REJECT: ghi mã đầu tiên theo thứ tự bảng trên.
 - FLAG: dòng vẫn vào bảng đích, mã nằm trong `_dq_flags` và có một dòng quarantine.
-- Resolve: không tự động. Dòng REJECT là một sự kiện chưa từng vào Silver, sự kiện hợp lệ khác của cùng khoá không sửa được nó. Người đóng bằng `nb_ops_delivery resolve` (mọi REJECT đang mở của một delivery), đặt `resolved_at_utc`, `resolved_run_id`.
+- Dựng lại hoàn toàn (`full`): quarantine là dữ liệu dẫn xuất từ Landing nên dòng cũ của các delivery được dựng lại bị thay bằng dòng tính lại (`quarantine_rows(..., replace=True)`); đóng thủ công (`resolved_at_utc`) của các delivery đó mất và phải làm lại. Dòng REJECT là một sự kiện chưa từng vào Silver, sự kiện hợp lệ khác của cùng khoá không sửa được nó. Người đóng bằng `nb_ops_delivery resolve` (mọi REJECT đang mở của một delivery), đặt `resolved_at_utc`, `resolved_run_id`.
 
 ---
 
@@ -1011,7 +1011,7 @@ Ba nguồn check, cùng ghi `meta.check_result`:
 | DQ-GLD-07 | `gld.fct_order_line` | `unknown_member_rate` | % dòng có SK = −1 hoặc trỏ dòng `is_inferred` | warning (> 1%) | touched |
 | DQ-GLD-08 | `gld.dim_*` (4) | `sk_collision` | một SK ứng với hai khoá tự nhiên | critical | full |
 | DQ-ING-01 | `meta.landed_file` | `duplicate_file` | file của lượt có `file_checksum` trùng file khác tên đã nạp | warning | run |
-| DQ-OPS-01 | `meta.delivery_log` | `freshness` | contract `daily` chưa giao cho batch sau `availableByLocalTime`. Đã giao = có delivery `LANDED`/`LOADED`, hoặc `run_log ingest.<source>` của batch là `UNCHANGED` hoặc `NO_DATA` `zero_rows`; file không tới (`no_staging_files`, `plan_mismatch`) là trễ | warning | `nb_sla_watch` |
+| DQ-OPS-01 | `meta.delivery_log` | `freshness` | contract `daily` chưa giao cho batch sau `availableByLocalTime`. Đã giao = có delivery `LANDED`/`LOADED`, hoặc `run_log ingest.<source>` của batch là `UNCHANGED` hoặc `NO_DATA` với `reason` `zero_rows`/`up_to_date`; file không tới (`no_staging_files`, `plan_mismatch`) là trễ | warning | `nb_sla_watch` |
 | DQ-OPS-03 | `meta.delivery_log` | `parked_delivery` | số delivery đang `PARKED` | warning (> 0) | run |
 
 Critical FAIL ⇒ `nb_dq` ghi hết mọi check rồi raise với danh sách check ID ⇒ lượt FAILED.
