@@ -75,9 +75,8 @@ Chỉ ở Dev. Đưa platform về trống để chạy lại từ đầu. Bư�
 | `nb_sla_watch` | Notebook | `pl_sla_watch` |
 | `nb_maintenance` | Notebook | `pl_maintenance` |
 | `nb_test_unit`, `nb_test_e2e` | Notebook test | người |
-| `nb_ops_delivery` | Notebook thao tác (park/release delivery) | người |
-| 
-b_backfill_dates | Notebook (sinh danh sách ngày cho pl_backfill) | pl_backfill |
+| `nb_ops_delivery` | Notebook thao tác (park/release delivery, resolve quarantine) | người |
+| `nb_backfill_dates` | Notebook (sinh danh sách ngày cho pl_backfill) | pl_backfill |
 | `pl_master_daily`, `pl_backfill`, `pl_sla_watch`, `pl_maintenance` | Data pipeline | lịch / người |
 
 Workspace Source: `lh_sim`, `lh_retail_drop`, `sqldb_erp_wholesale`, `nb_00_sim_common`, `nb_00_sim_setup`, `nb_00_sim_daily`, `nb_00_sim_reset`, `nb_00_sim_inject`.

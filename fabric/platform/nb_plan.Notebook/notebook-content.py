@@ -135,7 +135,8 @@ def plan():
         sources = result["sources"]
         errors += result["errors"]
         for nd in result["no_data"]:
-            log_run(RUN_ID, f"ingest.{nd['source_id']}", "ingest", "NO_DATA", reason=nd["reason"])
+            log_run(RUN_ID, f"ingest.{nd['source_id']}", "ingest", "NO_DATA", reason=nd["reason"],
+                    batch_from=batch_id, batch_to=batch_id)
         for ss in result["superseded"]:
             ss.setdefault("batch_id", batch_id)
         record_landed_files(result["superseded"], RUN_ID)

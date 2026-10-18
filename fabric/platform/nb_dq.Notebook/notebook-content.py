@@ -92,11 +92,13 @@ INACTIVE = {o["table"] for o in SILVER + GOLD if not o["is_active"]}
 
 def run_all():
     results = []  # (check_id, status, severity)
+    # Không lọc theo RUN_ID: lượt chạy lại sau lỗi có run_id mới, phần của lượt lỗi vẫn phải được kiểm.
+    run_ids = unchecked_run_ids(RUN_ID)
     for spec in CHECKS:
         if spec["check_id"].startswith("DQ-OPS-01") or spec["object"] in INACTIVE:
             continue  # DQ-OPS-01 do nb_sla_watch chạy; object chưa bật thì chưa có gì để kiểm
         try:
-            st = run_check(spec, RUN_ID, BATCH_ID, SCOPE)
+            st = run_check(spec, RUN_ID, BATCH_ID, SCOPE, run_ids)
         except Exception as exc:  # noqa: BLE001 — check hỏng là lỗi vận hành, không được nuốt
             log_check(RUN_ID, BATCH_ID, spec["check_id"], "platform", spec["type"], spec["object"], spec["scope"],
                       0, None, 0, spec["severity"], message=f"check lỗi: {type(exc).__name__}: {str(exc)[:300]}",
@@ -104,7 +106,7 @@ def run_all():
             st = "FAIL"
         if st is not None:
             results.append((spec["check_id"], st, spec["severity"]))
-    deliveries = deliveries_of_run(RUN_ID, ("LANDED", "LOADED"))
+    deliveries = deliveries_to_reconcile(None, ("LANDED", "LOADED"), source="contract")
     for check_id, delivery_id, st in run_contract_checks(deliveries, RUN_ID):
         results.append((f"{check_id}@{delivery_id[:8]}", st, "critical" if st == "FAIL" else "warning"))
     return results

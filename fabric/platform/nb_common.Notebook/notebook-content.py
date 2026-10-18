@@ -438,11 +438,13 @@ def changed_keys(table, rng, key_cols):
 # ---- 4.8 Quarantine ----------------------------------------------------------------------------------------
 
 _QUARANTINE_KEY = ["entity", "delivery_id", "business_key", "reason", "row_json"]
+# Cột riêng của lượt chạy: nằm trong row_json thì xử lý lại (run_id mới) sẽ ghi trùng dòng quarantine.
+_RUN_COLS = ("_run_id", "_logic_version", "_ingested_at_utc")
 
 
 def quarantine_frame(df, entity, run_id):
     """DataFrame dòng quarantine (REJECT cho dòng bị loại, FLAG cho mỗi mã của dòng được nhận)."""
-    payload = [c for c in df.columns if c not in ("_reject_reason", "_dq_flags", "_row_no")]
+    payload = [c for c in df.columns if c not in ("_reject_reason", "_dq_flags", "_row_no") + _RUN_COLS]
     base = (df.withColumn("_row_json", F.to_json(F.struct(*[F.col(f"`{c}`") for c in payload])))
               .withColumn("_flags_arr", F.coalesce(F.col("_dq_flags"), F.array().cast("array<string>"))))
 
@@ -471,16 +473,12 @@ def quarantine_rows(df, entity, run_id, table="slv.quarantine"):
     return n_reject, n_flag
 
 
-def resolve_quarantine(entity, keys_df, run_id, table="slv.quarantine"):
-    """Đóng dòng REJECT đang mở của khoá đã có dòng hợp lệ ở delivery khác (mới nhất của khoá đó)."""
-    latest = (keys_df.groupBy("_bk")
-              .agg(F.max_by("_delivery_id", "_delivered_at_utc").alias("_delivery_id")))
-    v = _view(latest, "resolve")
-    spark.sql(f"MERGE INTO {safe_table_name(table)} t USING {v} s "
-              f"ON t.entity = '{entity}' AND t.action = 'REJECT' AND t.resolved_at_utc IS NULL "
-              f"AND t.business_key = s._bk AND t.delivery_id <> s._delivery_id "
-              f"WHEN MATCHED THEN UPDATE SET t.resolved_at_utc = current_timestamp(), "
-              f"t.resolved_run_id = '{run_id}'")
+def resolve_quarantine(delivery_id, run_id, table="slv.quarantine"):
+    """Đóng thủ công mọi dòng REJECT đang mở của một delivery (chỉ nb_ops_delivery gọi, L13). Không tự đóng theo
+    khoá: dòng REJECT là một sự kiện chưa từng vào Silver, sự kiện hợp lệ khác của cùng khoá không sửa được nó."""
+    spark.sql(f"UPDATE {safe_table_name(table)} SET resolved_at_utc = current_timestamp(), "
+              f"resolved_run_id = '{run_id}' WHERE action = 'REJECT' AND resolved_at_utc IS NULL "
+              f"AND delivery_id = '{delivery_id}'")
 
 
 # ---- 4.9 snapshot_changes ----------------------------------------------------------------------------------
@@ -943,9 +941,37 @@ def exit_worker(result):
 
 # ---- 4.12 Check ------------------------------------------------------------------------------------------
 
-def _where(spec, run_id, *conds, alias=""):
+def _run_list(run_ids):
+    return ", ".join(f"'{r}'" for r in run_ids)
+
+
+def unchecked_run_ids(run_id):
+    """run_id của mọi lượt có sự kiện sau lần `dq` SUCCEEDED gần nhất, cộng lượt hiện tại. Lượt chạy lại sau lỗi có
+    run_id mới, nên check chỉ theo run_id hiện tại sẽ bỏ sót phần của lượt lỗi (PASS rỗng)."""
+    rows = spark.sql(
+        "SELECT DISTINCT run_id FROM meta.run_log WHERE event_at_utc > coalesce("
+        "(SELECT max(event_at_utc) FROM meta.run_log WHERE step = 'dq' AND event = 'SUCCEEDED' "
+        f"AND run_id <> '{run_id}'), TIMESTAMP'1900-01-01 00:00:00')").collect()
+    return sorted({r["run_id"] for r in rows} | {run_id})
+
+
+def source_delivered(c, batch_id):
+    """Nguồn đã giao cho batch: có delivery LANDED/LOADED, hoặc lần ingest báo UNCHANGED / zero_rows (nguồn giao đủ,
+    chỉ là không có gì mới). File không tới (no_staging_files, plan_mismatch) thì chưa giao."""
+    n = spark.sql(
+        "SELECT count(*) AS n FROM meta.v_delivery_state WHERE status IN ('LANDED', 'LOADED') "
+        f"AND source_system = '{c['source_system']}' AND entity = '{c['entity']}' "
+        f"AND batch_id = '{batch_id}'").collect()[0]["n"]
+    if n:
+        return True
+    return spark.sql(
+        f"SELECT count(*) AS n FROM meta.run_log WHERE step = 'ingest.{c['id']}' AND batch_from = '{batch_id}' "
+        "AND (event = 'UNCHANGED' OR (event = 'NO_DATA' AND reason = 'zero_rows'))").collect()[0]["n"] > 0
+
+
+def _where(spec, run_ids, *conds, alias=""):
     p = f"{alias}." if alias else ""
-    parts = ([f"{p}_run_id = '{run_id}'"] if spec["scope"] == "touched" else []) + list(conds)
+    parts = ([f"{p}_run_id IN ({_run_list(run_ids)})"] if spec["scope"] == "touched" else []) + list(conds)
     return ("WHERE " + " AND ".join(parts)) if parts else ""
 
 
@@ -958,13 +984,13 @@ def _single(sql):
     return r["actual"], r.get("sample")
 
 
-def _check_unique(spec, run_id):
+def _check_unique(spec, run_ids):
     cols = spec["params"]["cols"]
     keys = ", ".join(f"`{c}`" for c in cols)
     obj = spec["object"]
     if spec["scope"] == "touched":
         inner = (f"SELECT t.* FROM {obj} t LEFT SEMI JOIN (SELECT DISTINCT {keys} FROM {obj} "
-                 f"WHERE _run_id = '{run_id}') r ON {_eq(cols)}")
+                 f"WHERE _run_id IN ({_run_list(run_ids)})) r ON {_eq(cols)}")
     else:
         inner = f"SELECT * FROM {obj}"
     cast = ", ".join(f"CAST(`{c}` AS STRING)" for c in cols)
@@ -973,34 +999,34 @@ def _check_unique(spec, run_id):
                    f"FROM (SELECT {keys} FROM ({inner}) GROUP BY {keys} HAVING count(*) > 1)")
 
 
-def _check_not_null(spec, run_id):
+def _check_not_null(spec, run_ids):
     cond = "(" + " OR ".join(f"`{c}` IS NULL" for c in spec["params"]["cols"]) + ")"
     return _single(f"SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM {spec['object']} "
-                   f"{_where(spec, run_id, cond)}")
+                   f"{_where(spec, run_ids, cond)}")
 
 
-def _check_flag_count(spec, run_id):
+def _check_flag_count(spec, run_ids):
     flags = ", ".join(f"'{f}'" for f in spec["params"]["flags"])
     cond = f"size(array_intersect(_dq_flags, array({flags}))) > 0"
     return _single(f"SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM {spec['object']} "
-                   f"{_where(spec, run_id, cond)}")
+                   f"{_where(spec, run_ids, cond)}")
 
 
-def _check_scd2_one_current(spec, run_id):
+def _check_scd2_one_current(spec, run_ids):
     return _single("SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM ("
                    f"SELECT source_system, salesman_code FROM {spec['object']} GROUP BY source_system, salesman_code "
                    "HAVING sum(CASE WHEN is_current THEN 1 ELSE 0 END) <> 1)")
 
 
-def _check_scd2_contiguous(spec, run_id):
+def _check_scd2_contiguous(spec, run_ids):
     return _single("SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM ("
                    "SELECT valid_to, lead(valid_from) OVER (PARTITION BY source_system, salesman_code "
                    f"ORDER BY valid_from) AS nxt FROM {spec['object']}) "
                    "WHERE nxt IS NOT NULL AND nxt <> date_add(valid_to, 1)")
 
 
-def _check_unknown_member_rate(spec, run_id):
-    w = _where(spec, run_id, alias="f")
+def _check_unknown_member_rate(spec, run_ids):
+    w = _where(spec, run_ids, alias="f")
     return _single(
         "SELECT coalesce(100.0 * sum(CASE WHEN f.customer_sk = -1 OR f.product_sk = -1 OR f.salesman_sk = -1 "
         "OR c.is_inferred OR p.is_inferred OR s.is_inferred THEN 1 ELSE 0 END) / nullif(count(*), 0), 0) AS actual, "
@@ -1010,7 +1036,7 @@ def _check_unknown_member_rate(spec, run_id):
         f"LEFT JOIN gld.dim_salesman s ON f.salesman_sk = s.salesman_sk {w}")
 
 
-def _check_sk_collision(spec, run_id):
+def _check_sk_collision(spec, run_ids):
     sk = spec["params"]["sk"]
     nat = ", ".join(f"CAST(`{c}` AS STRING)" for c in spec["params"]["natural"])
     return _single(f"SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM ("
@@ -1018,26 +1044,26 @@ def _check_sk_collision(spec, run_id):
                    f"HAVING count(DISTINCT concat_ws('|', {nat})) > 1)")
 
 
-def _check_duplicate_file(spec, run_id):
+def _check_duplicate_file(spec, run_ids):
     return _single(
         "SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM meta.landed_file a "
-        f"WHERE a.run_id = '{run_id}' AND a.outcome = 'LANDED' AND a.file_checksum IS NOT NULL AND EXISTS ("
+        f"WHERE a.run_id IN ({_run_list(run_ids)}) AND a.outcome = 'LANDED' AND a.file_checksum IS NOT NULL AND EXISTS ("
         "SELECT 1 FROM meta.landed_file b WHERE b.source_system = a.source_system AND b.entity = a.entity "
         "AND b.file_checksum = a.file_checksum AND b.file_name <> a.file_name)")
 
 
-def _check_parked(spec, run_id):
+def _check_parked(spec, run_ids):
     return _single("SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM meta.v_delivery_state "
                    "WHERE status = 'PARKED'")
 
 
-def _check_schema_drift(spec, run_id):
+def _check_schema_drift(spec, run_ids):
     return _single("SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM meta.v_delivery_state "
-                   f"WHERE run_id = '{run_id}' AND status IN ('LOADED', 'FAILED') "
+                   f"WHERE run_id IN ({_run_list(run_ids)}) AND status IN ('LOADED', 'FAILED') "
                    "AND (size(schema_added) > 0 OR size(schema_missing) > 0)")
 
 
-def _check_event_date_vs_file(spec, run_id):
+def _check_event_date_vs_file(spec, run_ids):
     tz = " ".join(f"WHEN '{c['source_system']}' THEN '{c['source_timezone']}'"
                   for c in active_contracts() if c["silver_table"] == spec["object"]
                   and c["load_strategy"].startswith("file_"))
@@ -1047,35 +1073,28 @@ def _check_event_date_vs_file(spec, run_id):
     lag = (f"abs(datediff(to_date(from_utc_timestamp(updated_at_utc, CASE source_system {tz} END)), "
            "to_date(regexp_extract(_source_file, '([0-9]{8})', 1), 'yyyyMMdd'))) > 1")
     return _single(f"SELECT count(*) AS actual, CAST(NULL AS STRING) AS sample FROM {spec['object']} "
-                   f"{_where(spec, run_id, cond, lag)}")
+                   f"{_where(spec, run_ids, cond, lag)}")
 
-def _quarantine_rate(spec, run_id, batch_id):
+def _quarantine_rate(spec, run_id, run_ids):
     rows = spark.sql(
-        "SELECT delivery_id, source_system, entity, rows_read, rows_rejected FROM meta.v_delivery_state "
-        f"WHERE run_id = '{run_id}' AND status IN ('LOADED', 'FAILED') AND rows_read > 0").collect()
+        "SELECT delivery_id, batch_id, source_system, entity, rows_read, rows_rejected FROM meta.v_delivery_state "
+        f"WHERE run_id IN ({_run_list(run_ids)}) AND status IN ('LOADED', 'FAILED') AND rows_read > 0").collect()
     worst = "PASS"
     for r in rows:
         c = get_contract(f"{r['source_system']}.{r['entity']}")
         pct = 100.0 * (r["rows_rejected"] or 0) / r["rows_read"]
         warn, fail = c["quarantine_warn_pct"], c["quarantine_fail_pct"]
         st = "PASS" if pct <= warn else ("WARN" if pct <= fail else "FAIL")
-        log_check(run_id, batch_id, spec["check_id"], "platform", spec["type"],
+        log_check(run_id, r["batch_id"], spec["check_id"], "platform", spec["type"],
                   f"{r['source_system']}.{r['entity']}", r["delivery_id"], 0, pct, warn, spec["severity"],
                   message=f"rows_rejected/rows_read = {pct:.2f}% (warn {warn}%, fail {fail}%)", status=st)
         worst = "FAIL" if st == "FAIL" else ("WARN" if st == "WARN" and worst != "FAIL" else worst)
     return worst
 
 
-def _freshness(spec, run_id, batch_id):
-    late = []
-    for c in active_contracts():
-        if c["delivery_cadence"] != "daily":
-            continue
-        n = spark.sql("SELECT count(*) AS n FROM meta.v_delivery_state WHERE status = 'LOADED' "
-                      f"AND source_system = '{c['source_system']}' AND entity = '{c['entity']}' "
-                      f"AND batch_id = '{batch_id}'").collect()[0]["n"]
-        if n == 0:
-            late.append(c["id"])
+def _freshness(spec, batch_id):
+    late = [c["id"] for c in active_contracts()
+            if c["delivery_cadence"] == "daily" and not source_delivered(c, batch_id)]
     return len(late), ", ".join(late)
 
 
@@ -1086,17 +1105,19 @@ _CHECK_FUNCS = {"unique": _check_unique, "not_null": _check_not_null, "flag_coun
                 "schema_drift": _check_schema_drift, "event_date_vs_file": _check_event_date_vs_file}
 
 
-def run_check(spec, run_id, batch_id, run_scope):
-    """Chạy một check của CHECKS, ghi `meta.check_result`, trả status (None nếu bỏ qua theo phạm vi lượt)."""
+def run_check(spec, run_id, batch_id, run_scope, run_ids=None):
+    """Chạy một check của CHECKS, ghi `meta.check_result`, trả status (None nếu bỏ qua theo phạm vi lượt).
+    `run_ids`: các lượt chưa được kiểm (`unchecked_run_ids`); mặc định chỉ `run_id`."""
     if spec["scope"] == "full" and run_scope != "full":
         return None
+    run_ids = run_ids or [run_id]
     t = spec["type"]
     if t == "quarantine_rate":
-        return _quarantine_rate(spec, run_id, batch_id)
+        return _quarantine_rate(spec, run_id, run_ids)
     if t == "freshness":
-        actual, sample = _freshness(spec, run_id, batch_id)
+        actual, sample = _freshness(spec, batch_id)
     else:
-        actual, sample = _CHECK_FUNCS[t](spec, run_id)
+        actual, sample = _CHECK_FUNCS[t](spec, run_ids)
     thr = spec.get("threshold", 0)
     return log_check(run_id, batch_id, spec["check_id"], "platform", t, spec["object"], spec["scope"], 0, actual,
                      thr, spec["severity"], message=spec.get("description"), sample=sample)
@@ -1108,6 +1129,8 @@ def run_contract_checks(deliveries, run_id):
     for i, dv in enumerate(deliveries):
         d = _as_dict(dv)
         c = get_contract(f"{d['source_system']}.{d['entity']}")
+        if not c["quality"]:
+            continue
         view = temp_view(f"ct_{i}")
         read_landing(d).createOrReplaceTempView(view)
         for q in c["quality"]:
@@ -1165,12 +1188,14 @@ def deliveries_of_run(run_id, statuses=("LANDED", "LOADED"), table="meta.v_deliv
     return [r.asDict() for r in rows]
 
 
-def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False):
-    """Delivery chưa có kết quả đối soát `check_id` (không FAIL), bất kể thuộc lượt nào: lượt chạy lại sau lỗi
-    có `run_id` mới nên không thấy delivery của lượt lỗi. `latest_per_key`: chỉ delivery mới nhất của mỗi
-    (source_system, entity), chọn trước khi loại các delivery đã đối soát."""
+def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False, source="recon"):
+    """Delivery chưa có kết quả `source` (recon/contract) cho `check_id` (None: bất kỳ check nào của source) không
+    FAIL, bất kể thuộc lượt nào: lượt chạy lại sau lỗi có `run_id` mới nên không thấy delivery của lượt lỗi.
+    `latest_per_key`: chỉ delivery mới nhất của mỗi (source_system, entity), chọn trước khi loại các delivery
+    đã kiểm."""
     st = ", ".join(f"'{x}'" for x in statuses)
     keep = "WHERE _rk = 1" if latest_per_key else ""
+    only = f"AND c.check_id = '{check_id}' " if check_id else ""
     rows = spark.sql(
         f"WITH d AS (SELECT *, row_number() OVER (PARTITION BY source_system, entity "
         f"ORDER BY snapshot_date DESC NULLS LAST, delivered_at_utc DESC) AS _rk FROM {safe_table_name(table)} "
@@ -1178,7 +1203,7 @@ def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", l
         f"SELECT d.*, date_format(delivered_at_utc, 'yyyy-MM-dd HH:mm:ss.SSSSSS') AS delivered_at_str, "
         f"date_format(snapshot_date, 'yyyy-MM-dd') AS snapshot_date_str FROM d {keep} "
         f"{'AND' if latest_per_key else 'WHERE'} NOT EXISTS (SELECT 1 FROM meta.check_result c "
-        f"WHERE c.source = 'recon' AND c.check_id = '{check_id}' AND c.scope_value = d.delivery_id "
+        f"WHERE c.source = '{source}' {only}AND c.scope_value = d.delivery_id "
         f"AND c.status <> 'FAIL') ORDER BY source_system, entity, delivered_at_utc").collect()
     return [r.asDict() for r in rows]
 

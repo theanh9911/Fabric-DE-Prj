@@ -30,7 +30,7 @@
 | Fact Gold | `gld.fct_order_line` | MERGE upsert theo grain, update khi hash khác | `merge_upsert` |
 | Rebuild bất kỳ bảng nào | khi full | overwrite toàn bảng, giữ schema | `overwrite_table` |
 | `meta.*` | | append (`delivery_log`, `run_log`, `check_result`, `landed_file`), MERGE (`table_state`) | `log_*`, `record_*`, `state_put` |
-| Quarantine | `slv.quarantine` | MERGE chỉ chèn; đánh dấu đã xử lý bằng UPDATE `resolved_at_utc` | `quarantine_rows`, `resolve_quarantine` |
+| Quarantine | `slv.quarantine` | MERGE chỉ chèn; đánh dấu đã xử lý bằng UPDATE `resolved_at_utc` | `quarantine_rows`, `resolve_quarantine` (thủ công, qua `nb_ops_delivery`) |
 
 Cấm: `DELETE` rồi `append` thành hai lệnh; `DROP TABLE` trong worker; tạo bảng ngầm bằng `saveAsTable` lần đầu (mọi bảng tạo bằng DDL ở `nb_setup_ddl`); `mergeSchema`/`autoMerge`.
 

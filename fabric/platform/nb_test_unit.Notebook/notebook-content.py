@@ -612,10 +612,13 @@ def test_snapshot__changes_incremental():
     assert got == [("B", "2026-01-05", "DELETE")], f"A không đổi, B vắng ⇒ DELETE: {got}"
 
 
-def _qdf(rows):
-    return spark.createDataFrame(
+def _qdf(rows, run_id="run1"):
+    """Như dữ liệu conform thật: có cột riêng của lượt (_run_id, _logic_version, _ingested_at_utc) đổi theo lượt."""
+    return (spark.createDataFrame(
         rows, "source_system string, _batch_id string, _delivery_id string, _bk string, _reject_reason string, "
               "_dq_flags array<string>, _delivered_at_utc timestamp, _row_no bigint, payload string")
+            .withColumn("_run_id", F.lit(run_id)).withColumn("_logic_version", F.lit(1))
+            .withColumn("_ingested_at_utc", F.current_timestamp()))
 
 
 def test_quarantine__reject_flag_resolve():
@@ -625,22 +628,23 @@ def test_quarantine__reject_flag_resolve():
               "batch_id STRING NOT NULL, delivery_id STRING NOT NULL, business_key STRING, reason STRING NOT NULL, "
               "action STRING NOT NULL, row_json STRING NOT NULL, run_id STRING NOT NULL, "
               "quarantined_at_utc TIMESTAMP NOT NULL, resolved_at_utc TIMESTAMP, resolved_run_id STRING) USING DELTA")
-    d1, d2 = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc), dt.datetime(2026, 1, 2, tzinfo=dt.timezone.utc)
+    d1 = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
     rows = [("r", "20260101", "dl1", "r|O1|P1", "invalid_price", [], d1, 1, "x"),
             ("r", "20260101", "dl1", None, "missing_business_key", [], d1, 2, "y"),
             ("r", "20260101", "dl1", "r|O2|P1", None, ["negative_quantity"], d1, 3, "z"),
             ("r", "20260101", "dl1", "r|O3|P1", None, [], d1, 4, "ok")]
     n_rej, n_flag = quarantine_rows(_qdf(rows), "orders", "run1", table=t)
     assert (n_rej, n_flag) == (2, 1), (n_rej, n_flag)
-    quarantine_rows(_qdf(rows), "orders", "run2", table=t)
-    assert spark.table(t).count() == 3, "chạy lại không được ghi trùng (kể cả khoá NULL)"
-    ok = _qdf([("r", "20260102", "dl2", "r|O1|P1", None, [], d2, 1, "fixed")])
-    resolve_quarantine("orders", ok, "run3", table=t)
-    open_ = {r["business_key"] for r in spark.table(t).where("resolved_at_utc IS NULL AND action = 'REJECT'").collect()}
-    assert open_ == {None}, f"chỉ khoá O1 được đóng: {open_}"
-    same = _qdf([("r", "20260101", "dl1", None, None, [], d1, 9, "same")])
-    resolve_quarantine("orders", same, "run4", table=t)
-    assert spark.table(t).where("resolved_at_utc IS NULL AND action = 'REJECT'").count() == 1
+    quarantine_rows(_qdf(rows, "run2"), "orders", "run2", table=t)
+    assert spark.table(t).count() == 3, "xử lý lại ở lượt khác không được ghi trùng (kể cả khoá NULL)"
+    assert not any(c in r["row_json"] for r in spark.table(t).collect() for c in ("_run_id", "_ingested_at_utc")), \
+        "row_json không được chứa cột riêng của lượt"
+    resolve_quarantine("dl2", "run3", table=t)
+    assert spark.table(t).where("resolved_at_utc IS NULL AND action = 'REJECT'").count() == 2, \
+        "sự kiện hợp lệ ở delivery khác không được tự đóng REJECT của delivery dl1"
+    resolve_quarantine("dl1", "run4", table=t)
+    assert spark.table(t).where("resolved_at_utc IS NULL AND action = 'REJECT'").count() == 0
+    assert spark.table(t).where("action = 'FLAG' AND resolved_at_utc IS NULL").count() == 1, "FLAG không bị đóng"
 
 # METADATA ********************
 

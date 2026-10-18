@@ -103,11 +103,9 @@ for c in active_contracts():
     deadline = datetime.strptime(LOAD_DATE, "%Y-%m-%d") + timedelta(days=1, hours=hh, minutes=mm)
     if now_local < deadline:
         continue
-    n = spark.sql("SELECT count(*) AS n FROM meta.v_delivery_state WHERE status = 'LOADED' "
-                  f"AND source_system = '{c['source_system']}' AND entity = '{c['entity']}' "
-                  f"AND batch_id = '{BATCH_ID}'").collect()[0]["n"]
+    n = source_delivered(c, BATCH_ID)
     log_check(RUN_ID, BATCH_ID, "DQ-OPS-01", "platform", "freshness", c["id"], LOAD_DATE, 0, 0 if n else 1, 0,
-              "warning", message=f"{c['id']}: {'đã có' if n else 'chưa có'} delivery LOADED cho batch {BATCH_ID}"
+              "warning", message=f"{c['id']}: {'đã giao' if n else 'chưa giao'} cho batch {BATCH_ID}"
                                  f" (hạn {deadline:%Y-%m-%d %H:%M})")
     if not n:
         late.append({"source_id": c["id"], "owner": c["owner"], "support_channel": c["support_channel"]})

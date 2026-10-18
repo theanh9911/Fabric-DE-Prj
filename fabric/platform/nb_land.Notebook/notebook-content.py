@@ -114,7 +114,8 @@ def last_snapshot_checksum():
 
 def finish(outcome, rows=0, reason=None, delivery_id=None):
     event = {"DELIVERED": "SUCCEEDED", "NO_DATA": "NO_DATA", "UNCHANGED": "UNCHANGED"}[outcome]
-    log_run(RUN_ID, STEP, "ingest", event, reason=reason, rows_in=rows)
+    log_run(RUN_ID, STEP, "ingest", event, reason=reason, rows_in=rows, batch_from=SRC["batch_id"],
+            batch_to=SRC["batch_id"])
     return {"source_id": SRC["source_id"], "outcome": outcome, "delivery_id": delivery_id, "rows_landed": rows}
 
 

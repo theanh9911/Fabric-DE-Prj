@@ -567,7 +567,7 @@ CREATE TABLE IF NOT EXISTS slv.quarantine (
 CREATE OR REPLACE VIEW slv.v_quarantine_open AS
 SELECT * FROM slv.quarantine WHERE resolved_at_utc IS NULL;
 ```
-Khoá chống ghi trùng: `(entity, delivery_id, business_key, reason, row_json)`.
+Khoá chống ghi trùng: `(entity, delivery_id, business_key, reason, row_json)`. `row_json` không chứa cột riêng của lượt (`_run_id`, `_logic_version`, `_ingested_at_utc`), nếu không xử lý lại ở lượt khác sẽ ghi trùng và RC-03 FAIL.
 
 ### 7.2 Mã lý do
 
@@ -590,7 +590,7 @@ Khoá chống ghi trùng: `(entity, delivery_id, business_key, reason, row_json)
 
 - Một dòng có nhiều lỗi REJECT: ghi mã đầu tiên theo thứ tự bảng trên.
 - FLAG: dòng vẫn vào bảng đích, mã nằm trong `_dq_flags` và có một dòng quarantine.
-- Resolve: khi một delivery sau nạp thành công dòng hợp lệ có cùng `(entity, business_key)`, mọi dòng REJECT đang mở của khoá đó được đặt `resolved_at_utc`, `resolved_run_id`.
+- Resolve: không tự động. Dòng REJECT là một sự kiện chưa từng vào Silver, sự kiện hợp lệ khác của cùng khoá không sửa được nó. Người đóng bằng `nb_ops_delivery resolve` (mọi REJECT đang mở của một delivery), đặt `resolved_at_utc`, `resolved_run_id`.
 
 ---
 
@@ -697,10 +697,9 @@ Lỗi ⇒ raise (activity Failed, lượt dừng).
 5. rejected = conformed có _reject_reason → quarantine REJECT; flagged → quarantine FLAG
 6. accepted = conformed không reject; dedupe theo _event_key (R-ORD-02)
 7. full ⇒ overwrite_table ; incremental ⇒ merge_events (R-ORD-03)
-8. resolve_quarantine theo _bk của accepted
-9. record_delivery LOADED cho delivery đã xử lý, FAILED cho delivery bị loại ở bước 1
-10. state_put, log_run
-11. đọc lại v_pending_delivery: còn delivery FAILED ⇒ raise (activity Failed, Gold không chạy);
+8. record_delivery LOADED cho delivery đã xử lý, FAILED cho delivery bị loại ở bước 1
+9. state_put, log_run
+10. đọc lại v_pending_delivery: còn delivery FAILED ⇒ raise (activity Failed, Gold không chạy);
     ngược lại exit_worker
 ```
 ### 9.3 `nb_slv_master` (`p_entity`)
@@ -887,14 +886,15 @@ Notebook tự đọc `meta`:
 
 | Tham số | Giá trị |
 |---|---|
-| `p_action` | `park` / `release` |
+| `p_action` | `park` / `release` / `resolve` |
 | `p_delivery_id` | một hoặc nhiều ID, cách nhau dấu phẩy |
-| `p_reason` | bắt buộc với `park`; ghi vào `delivery_log.error_message` |
-| `p_operator` | bắt buộc; tên người chạy, ghi vào `run_log.params` |
+| `p_reason` | bắt buộc với `park` và `resolve`; ghi vào `delivery_log.error_message` (`park`) hoặc `run_log.params` |
+| `p_operator` | bắt buộc; tên người chạy do người gõ, ghi vào `run_log.params`. Danh tính thật lấy từ `notebookutils.runtime.context`, ghi ở `params.actor` |
 | `p_confirm` | phải bằng `CONFIRM` |
 
 - `park`: chỉ nhận delivery đang `FAILED` hoặc `LANDED`; ghi dòng `PARKED`. Delivery `LOADED` không park được (dữ liệu đã vào Silver; muốn loại phải dựng lại bằng `full`).
 - `release`: `PARKED` ⇒ `LANDED`; lượt `normal` kế tiếp xử lý lại.
+- `resolve`: đóng mọi dòng REJECT đang mở của delivery trong `slv.quarantine` (sau khi nguồn đã xử lý hoặc chấp nhận bỏ); không đổi trạng thái delivery.
 - Mỗi thao tác ghi một dòng `run_log` (`step = ops.<action>`, `layer = ops`, `params` có ID, lý do, người chạy). Landing không bị đụng (L2).
 - Không có khoá: đây là thao tác hiếm, do người chạy. Quy tắc vận hành: không chạy khi lượt đang chạy, và báo cho nhóm khi chạy.
 - Delivery `PARKED` là dữ liệu bị loại có chủ đích: DQ-OPS-03 cảnh báo mỗi lượt cho tới khi `release`, nên không bị quên.
@@ -918,7 +918,7 @@ Thông tin lượt lỗi ở đâu: Monitor (activity nào Failed), `meta.v_run_
 
 | Notebook | Tham số | Kết quả |
 |---|---|---|
-| `nb_dq` | `p_run_id`, `p_batch_id`, `p_check_scope` | đọc delivery và bảng của lượt từ `meta`; ghi `meta.check_result`; có critical FAIL ⇒ raise sau khi ghi hết; ngược lại `{"contract": 1, "status": "SUCCEEDED", "checks": n, "warnings": n}` |
+| `nb_dq` | `p_run_id`, `p_batch_id`, `p_check_scope` | kiểm mọi lượt chưa được kiểm (`unchecked_run_ids`: lượt có sự kiện sau lần `dq` SUCCEEDED gần nhất) và mọi delivery chưa có check contract (không FAIL), kể cả của lượt trước đã lỗi giữa chừng; ghi `meta.check_result`; có critical FAIL ⇒ raise sau khi ghi hết; ngược lại `{"contract": 1, "status": "SUCCEEDED", "checks": n, "warnings": n}` |
 | `nb_recon` | như `nb_dq` | như `nb_dq`; RC-01 đến RC-04 theo delivery chưa có kết quả đối soát (không FAIL), kể cả delivery của lượt trước đã lỗi giữa chừng; RC-05 trên toàn bảng |
 | `nb_close` | `p_run_id`, `p_status`, `p_error` | ghi `run_log` (`step = pipeline`, `event = p_status`, `error_message = p_error`) |
 | `nb_sla_watch` | `p_load_date` (trống ⇒ hôm qua giờ VN) | ghi DQ-OPS-01; `{"late_sources": [{"source_id", "owner", "support_channel"}]}` |
@@ -991,7 +991,7 @@ Ba nguồn check, cùng ghi `meta.check_result`:
 - **Contract**: `quality[]` của contract, chạy trên mỗi delivery của lượt ([03 §3.5](03-contract.md#35-quality)).
 - **Đối soát**: [§14](#14-đối-soát).
 
-`scope`: `touched` (chỉ dòng có `_run_id` của lượt), `full` (cả bảng; chạy vào ngày `SETTINGS.full_checks_weekday` theo `p_load_date` và mọi lượt có `p_full_reload`; `nb_plan` quyết định và truyền `check_scope`), `run` (theo dữ liệu `meta` của lượt).
+`scope`: `touched` (chỉ dòng có `_run_id` thuộc các lượt chưa được kiểm, gồm lượt hiện tại; không chỉ `run_id` hiện tại vì lượt chạy lại sau lỗi có `run_id` mới), `full` (cả bảng; chạy vào ngày `SETTINGS.full_checks_weekday` theo `p_load_date` và mọi lượt có `p_full_reload`; `nb_plan` quyết định và truyền `check_scope`), `run` (theo dữ liệu `meta` của lượt).
 
 | ID | Đối tượng | Loại | Điều kiện | Severity | Scope |
 |---|---|---|---|---|---|
@@ -1011,7 +1011,7 @@ Ba nguồn check, cùng ghi `meta.check_result`:
 | DQ-GLD-07 | `gld.fct_order_line` | `unknown_member_rate` | % dòng có SK = −1 hoặc trỏ dòng `is_inferred` | warning (> 1%) | touched |
 | DQ-GLD-08 | `gld.dim_*` (4) | `sk_collision` | một SK ứng với hai khoá tự nhiên | critical | full |
 | DQ-ING-01 | `meta.landed_file` | `duplicate_file` | file của lượt có `file_checksum` trùng file khác tên đã nạp | warning | run |
-| DQ-OPS-01 | `meta.delivery_log` | `freshness` | contract `daily` chưa có delivery `LOADED` cho batch sau `availableByLocalTime` | warning | `nb_sla_watch` |
+| DQ-OPS-01 | `meta.delivery_log` | `freshness` | contract `daily` chưa giao cho batch sau `availableByLocalTime`. Đã giao = có delivery `LANDED`/`LOADED`, hoặc `run_log ingest.<source>` của batch là `UNCHANGED` hoặc `NO_DATA` `zero_rows`; file không tới (`no_staging_files`, `plan_mismatch`) là trễ | warning | `nb_sla_watch` |
 | DQ-OPS-03 | `meta.delivery_log` | `parked_delivery` | số delivery đang `PARKED` | warning (> 0) | run |
 
 Critical FAIL ⇒ `nb_dq` ghi hết mọi check rồi raise với danh sách check ID ⇒ lượt FAILED.

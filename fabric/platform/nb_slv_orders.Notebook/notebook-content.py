@@ -131,7 +131,6 @@ def build(decision):
     acc = (conf.where(~rej).withColumn("_rn", F.row_number().over(w)).where("_rn = 1")
            .drop("_rn", *DROP_COLS))
     m = overwrite_table(TARGET, acc) if full else merge_events(TARGET, acc)
-    resolve_quarantine(ENTITY, acc.select("_bk", "_delivery_id", "_delivered_at_utc"), RUN_ID)
     for d in ok:
         s = stats.get(d["delivery_id"])
         n, r, fl = (int(s["n"]), int(s["rejected"]), int(s["flagged"])) if s else (0, 0, 0)

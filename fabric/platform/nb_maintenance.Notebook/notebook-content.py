@@ -78,7 +78,7 @@ import time
 
 RUN_ID = new_id()
 RETAIN_HOURS = 720
-optimized, vacuumed, removed = [], [], []
+optimized, vacuumed, removed, unknown_age = [], [], [], []
 
 
 def tables_of(schema):
@@ -101,15 +101,19 @@ try:
     if notebookutils.fs.exists("Files/_staging"):
         cutoff_ms = int((time.time() - 24 * 3600) * 1000)
         for d in notebookutils.fs.ls("Files/_staging"):
-            if d.modifyTime is not None and d.modifyTime < cutoff_ms:
+            if d.modifyTime is None:
+                unknown_age.append(d.name)  # OneLake không trả modifyTime cho thư mục: không xoá mù, để người xem
+            elif d.modifyTime < cutoff_ms:
                 notebookutils.fs.rm(d.path, True)
                 removed.append(d.name)
 except Exception as exc:  # noqa: BLE001
     log_run(RUN_ID, "maintenance", "maint", "FAILED", error_message=f"{type(exc).__name__}: {str(exc)[:1500]}")
     raise
 log_run(RUN_ID, "maintenance", "maint", "SUCCEEDED", rows_in=len(optimized),
-        reason=f"optimized={len(optimized)} vacuumed={len(vacuumed)} staging_removed={len(removed)}")
-notebookutils.notebook.exit(json.dumps({"optimized": optimized, "vacuumed": vacuumed, "staging_removed": removed}))
+        reason=f"optimized={len(optimized)} vacuumed={len(vacuumed)} staging_removed={len(removed)} "
+               f"staging_unknown_age={len(unknown_age)}")
+notebookutils.notebook.exit(json.dumps({"optimized": optimized, "vacuumed": vacuumed, "staging_removed": removed,
+                                        "staging_unknown_age": unknown_age}))
 
 # METADATA ********************
 

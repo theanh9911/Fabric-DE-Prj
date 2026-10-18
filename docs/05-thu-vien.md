@@ -358,9 +358,9 @@ Quy ước chung:
 
 | Hàm | Chữ ký | Hành vi |
 |---|---|---|
-| `quarantine_frame` | `(df, entity, run_id) -> DataFrame` | dòng có `_reject_reason` ⇒ `action = REJECT`; dòng được nhận, `explode(_dq_flags)` ⇒ `action = FLAG`; `row_json` = `to_json` mọi cột trừ `_reject_reason`, `_dq_flags`, `_row_no`; khử trùng theo khoá chống trùng. `nb_recon` dùng cho RC-03 |
+| `quarantine_frame` | `(df, entity, run_id) -> DataFrame` | dòng có `_reject_reason` ⇒ `action = REJECT`; dòng được nhận, `explode(_dq_flags)` ⇒ `action = FLAG`; `row_json` = `to_json` mọi cột trừ `_reject_reason`, `_dq_flags`, `_row_no` và cột riêng của lượt (`_run_id`, `_logic_version`, `_ingested_at_utc`); khử trùng theo khoá chống trùng. `nb_recon` dùng cho RC-03 |
 | `quarantine_rows` | `(df, entity, run_id, table="slv.quarantine") -> (int, int)` | `merge_insert_only` `quarantine_frame` theo khoá chống trùng ([04 §7.1](04-kien-truc.md#71-slvquarantine), so sánh null-safe vì `business_key` có thể NULL); trả (số reject, số flag) |
-| `resolve_quarantine` | `(entity, keys_df, run_id, table="slv.quarantine")` | `keys_df` có `_bk`, `_delivery_id`, `_delivered_at_utc` của dòng hợp lệ. Đặt `resolved_at_utc`, `resolved_run_id` cho dòng REJECT đang mở cùng `business_key` nhưng thuộc **delivery khác** delivery mới nhất của khoá đó (dòng lỗi và dòng đúng cùng delivery không tự đóng nhau) |
+| `resolve_quarantine` | `(delivery_id, run_id, table="slv.quarantine")` | đặt `resolved_at_utc`, `resolved_run_id` cho mọi dòng REJECT đang mở của `delivery_id`. Chỉ `nb_ops_delivery resolve` gọi (L13); không tự đóng theo khoá |
 
 ### 4.9 `snapshot_changes(snapshots, previous, key_cols)`
 
@@ -407,7 +407,9 @@ Test: 3 snapshot (S1: A, B; S2: A, B đã sửa; S3: B, rồi S4: A, B) ⇒ INSE
 | `state_put` | Silver/Gold | `(target, logic_version, input_versions, output_version, run_id, exec_mode)` | MERGE theo `target_table` |
 | `select_deliveries` | Silver | `(table, mode="normal", load_from=None, load_to=None, full=False) -> list[dict]` | delivery cần xử lý theo [04 §10.4](04-kien-truc.md#104-chọn-delivery-cho-silver), sắp theo `snapshot_date`, `delivered_at_utc`; thêm `delivered_at_str`, `snapshot_date_str` |
 | `deliveries_of_run` | `nb_dq`, `nb_recon` | `(run_id, statuses, table="meta.v_delivery_state") -> list[dict]` | delivery có trạng thái mới nhất thuộc `run_id` |
-| `deliveries_to_reconcile` | `nb_recon` | `(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False) -> list[dict]` | delivery chưa có kết quả `recon` cho `check_id` (không FAIL), bất kể `run_id`; `latest_per_key` chọn delivery mới nhất mỗi (source_system, entity) trước khi loại delivery đã đối soát |
+| `deliveries_to_reconcile` | `nb_recon`, `nb_dq` | `(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False, source="recon") -> list[dict]` | delivery chưa có kết quả `source` (`recon`/`contract`) cho `check_id` (`None`: bất kỳ check nào của source) không FAIL, bất kể `run_id`; `latest_per_key` chọn delivery mới nhất mỗi (source_system, entity) trước khi loại delivery đã kiểm |
+| `unchecked_run_ids` | `nb_dq` | `(run_id) -> list[str]` | `run_id` của mọi lượt có sự kiện trong `run_log` sau lần `dq` SUCCEEDED gần nhất, cộng `run_id` hiện tại; truyền cho `run_check(..., run_ids)` |
+| `source_delivered` | `nb_sla_watch`, `run_check` (freshness) | `(contract, batch_id) -> bool` | nguồn đã giao cho batch: delivery `LANDED`/`LOADED`, hoặc `run_log ingest.<source>` của batch là `UNCHANGED` / `NO_DATA` `zero_rows` |
 | `decide_run` | Silver/Gold | `(target, full_reload=False, scope="ALL", mode="normal", load_from=None, load_to=None) -> dict` | theo [04 §10.2](04-kien-truc.md#102-quyết-định-chạy-từng-node); tự đọc `table_state`, version input, delivery chờ; trả `{decision, exec_mode, reason, input_versions}` với `input_versions = {"<bảng>": {"from": n, "to": m}}` (chỉ input `full`/`cdf`; Silver là `{}`) |
 | `run_node` | Silver/Gold | `(target, build, run_id, full_reload, scope, mode, load_from, load_to) -> dict` | khung chạy một node: `decide_run` ⇒ SKIP ghi `run_log` và trả kết quả `SKIPPED`; RUN ⇒ `run_log STARTED`, `build(decision)` (ghi dữ liệu, trả dict số liệu; lỗi ⇒ `run_log FAILED` rồi raise), `state_put`, `run_log SUCCEEDED`, `worker_result`. `build` có thể trả `exec_mode`, `reason` (ghi đè), `skip_state` |
 | `gold_audit` | Gold | `(df, run_id, logic_version) -> DataFrame` | thêm `_run_id`, `_logic_version`, `_updated_at_utc` |
