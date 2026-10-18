@@ -90,6 +90,8 @@ NB_NAME = "nb_recon"
 RUN_ID, BATCH_ID = p_run_id, p_batch_id
 ACTIVE = {o["table"] for o in SILVER + GOLD if o["is_active"]}
 RESULTS = []
+# Bảng vừa được dựng lại hoàn toàn: đối soát lại mọi delivery, không tin kết quả PASS của lần trước.
+REBUILT = rebuilt_since_last_recon()
 
 
 def rc(check_id, delivery_or_obj, a, b, severity, message, scope_value=None):
@@ -111,7 +113,7 @@ def rc01():
 
 def rc02_rc03():
     spec = get_silver("slv.orders_event")
-    for d in deliveries_to_reconcile("RC-02", ("LOADED",)):
+    for d in deliveries_to_reconcile("RC-02", ("LOADED",), include_checked=REBUILT):
         if f"{d['source_system']}.{d['entity']}" not in {c["id"] for c in contracts_for_silver("slv.orders_event")}:
             continue
         conf = conform_delivery(d, spec).persist()
@@ -131,7 +133,7 @@ def rc02_rc03():
 
 def rc04():
     latest = {}
-    for d in deliveries_to_reconcile("RC-04", ("LOADED",), latest_per_key=True):
+    for d in deliveries_to_reconcile("RC-04", ("LOADED",), latest_per_key=True, include_checked=REBUILT):
         tbl = next((c["silver_table"] for c in active_contracts()
                     if c["source_system"] == d["source_system"] and c["entity"] == d["entity"]), None)
         if tbl is None or get_silver(tbl)["kind"] != "snapshot" or tbl not in ACTIVE:

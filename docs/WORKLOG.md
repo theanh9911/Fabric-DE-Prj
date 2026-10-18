@@ -197,3 +197,10 @@ Tài liệu đã sửa: 01 §3, 04 (§7.1, §7.2, §9.2, §10.7, §10.9, §13), 
 Kiểm tra local: uv run tools/check_repo.py → xem commit.
 Kiểm chứng Fabric: chưa kiểm chứng. Cần: Update all, chạy `nb_test_unit` (test quarantine mới có cột riêng của lượt và resolve theo delivery); sau đó G2–G8 trong kế hoạch. Lưu ý: dòng quarantine trùng đã có ở Dev từ lượt cũ chỉ hết khi reset (G2).
 Còn lại / câu hỏi: không có unit test cho `unchecked_run_ids`, `source_delivered` (đọc thẳng bảng `meta.*`); kiểm bằng G6, G7. Quyết định gender `X` và `p_operator` vs danh tính runtime cần xác nhận khi chạy thật (`runtime.context` có `userName` không).
+## 2026-10-18 — nb_recon: đối soát lại sau khi dựng lại toàn bộ (chưa kiểm chứng Fabric) — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Phát hiện: lượt `rerun` + `p_full_reload` chỉ cho `checks: 2` (RC-05). `deliveries_to_reconcile` (ad895ad) bỏ delivery đã có kết quả không FAIL, nên sau khi Silver/Gold được dựng lại từ Landing, RC-02 đến RC-04 không kiểm lại các delivery cũ với bảng mới.
+Đã làm: `rebuilt_since_last_recon()` và tham số `include_checked` của `deliveries_to_reconcile`; `nb_recon` đối soát lại mọi delivery cho RC-02 đến RC-04 khi bảng vừa được dựng lại. RC-01 (nguồn ↔ Landing) không đổi vì Landing không bị dựng lại.
+Cũng ghi lại: hướng dẫn tham số lượt dựng lại trước đó sai hai lần (PF04, PF05). Đúng: `p_mode=rerun`, `p_full_reload=true`, `p_load_date` và `p_load_date_to` để trống (04 §11.3).
+File: nb_common, nb_recon. Tài liệu: 04 §10.9, 05 §4.13.
+Kiểm chứng Fabric: chưa kiểm chứng. Lần `recon` đã SUCCEEDED sau lượt dựng lại trước nên không còn thấy lần dựng đó; cần chạy lại lượt dựng lại một lần nữa, kỳ vọng recon > 2 check (RC-02 đến RC-04 cho mọi delivery) và RC-03 PASS.

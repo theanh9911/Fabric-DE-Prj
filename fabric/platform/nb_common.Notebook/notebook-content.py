@@ -1188,23 +1188,35 @@ def deliveries_of_run(run_id, statuses=("LANDED", "LOADED"), table="meta.v_deliv
     return [r.asDict() for r in rows]
 
 
-def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False, source="recon"):
+def rebuilt_since_last_recon():
+    """Silver/Gold được dựng lại hoàn toàn (exec_mode full) sau lần `recon` SUCCEEDED gần nhất: bảng đã đổi nên kết
+    quả đối soát cũ của delivery không còn giá trị, phải đối soát lại."""
+    return spark.sql(
+        "SELECT count(*) AS n FROM meta.run_log WHERE exec_mode = 'full' AND event = 'SUCCEEDED' "
+        "AND (step LIKE 'slv.%' OR step LIKE 'gld.%') AND event_at_utc > coalesce("
+        "(SELECT max(event_at_utc) FROM meta.run_log WHERE step = 'recon' AND event = 'SUCCEEDED'), "
+        "TIMESTAMP'1900-01-01 00:00:00')").collect()[0]["n"] > 0
+
+
+def deliveries_to_reconcile(check_id, statuses, table="meta.v_delivery_state", latest_per_key=False, source="recon",
+                            include_checked=False):
     """Delivery chưa có kết quả `source` (recon/contract) cho `check_id` (None: bất kỳ check nào của source) không
     FAIL, bất kể thuộc lượt nào: lượt chạy lại sau lỗi có `run_id` mới nên không thấy delivery của lượt lỗi.
     `latest_per_key`: chỉ delivery mới nhất của mỗi (source_system, entity), chọn trước khi loại các delivery
-    đã kiểm."""
+    đã kiểm. `include_checked`: bỏ điều kiện "chưa kiểm" (đối soát lại tất cả sau khi bảng được dựng lại)."""
     st = ", ".join(f"'{x}'" for x in statuses)
-    keep = "WHERE _rk = 1" if latest_per_key else ""
     only = f"AND c.check_id = '{check_id}' " if check_id else ""
+    conds = (["_rk = 1"] if latest_per_key else []) + ([] if include_checked else [
+        f"NOT EXISTS (SELECT 1 FROM meta.check_result c WHERE c.source = '{source}' {only}"
+        f"AND c.scope_value = d.delivery_id AND c.status <> 'FAIL')"])
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
     rows = spark.sql(
         f"WITH d AS (SELECT *, row_number() OVER (PARTITION BY source_system, entity "
         f"ORDER BY snapshot_date DESC NULLS LAST, delivered_at_utc DESC) AS _rk FROM {safe_table_name(table)} "
         f"WHERE status IN ({st})) "
         f"SELECT d.*, date_format(delivered_at_utc, 'yyyy-MM-dd HH:mm:ss.SSSSSS') AS delivered_at_str, "
-        f"date_format(snapshot_date, 'yyyy-MM-dd') AS snapshot_date_str FROM d {keep} "
-        f"{'AND' if latest_per_key else 'WHERE'} NOT EXISTS (SELECT 1 FROM meta.check_result c "
-        f"WHERE c.source = '{source}' {only}AND c.scope_value = d.delivery_id "
-        f"AND c.status <> 'FAIL') ORDER BY source_system, entity, delivered_at_utc").collect()
+        f"date_format(snapshot_date, 'yyyy-MM-dd') AS snapshot_date_str FROM d {where} "
+        f"ORDER BY source_system, entity, delivered_at_utc").collect()
     return [r.asDict() for r in rows]
 
 

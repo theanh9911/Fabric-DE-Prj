@@ -919,7 +919,7 @@ Thông tin lượt lỗi ở đâu: Monitor (activity nào Failed), `meta.v_run_
 | Notebook | Tham số | Kết quả |
 |---|---|---|
 | `nb_dq` | `p_run_id`, `p_batch_id`, `p_check_scope` | kiểm mọi lượt chưa được kiểm (`unchecked_run_ids`: lượt có sự kiện sau lần `dq` SUCCEEDED gần nhất) và mọi delivery chưa có check contract (không FAIL), kể cả của lượt trước đã lỗi giữa chừng; ghi `meta.check_result`; có critical FAIL ⇒ raise sau khi ghi hết; ngược lại `{"contract": 1, "status": "SUCCEEDED", "checks": n, "warnings": n}` |
-| `nb_recon` | như `nb_dq` | như `nb_dq`; RC-01 đến RC-04 theo delivery chưa có kết quả đối soát (không FAIL), kể cả delivery của lượt trước đã lỗi giữa chừng; RC-05 trên toàn bảng |
+| `nb_recon` | như `nb_dq` | như `nb_dq`; RC-01 đến RC-04 theo delivery chưa có kết quả đối soát (không FAIL), kể cả delivery của lượt trước đã lỗi giữa chừng; RC-02 đến RC-04 đối soát lại mọi delivery khi Silver/Gold vừa được dựng lại hoàn toàn sau lần `recon` SUCCEEDED gần nhất (`rebuilt_since_last_recon`); RC-05 trên toàn bảng |
 | `nb_close` | `p_run_id`, `p_status`, `p_error` | ghi `run_log` (`step = pipeline`, `event = p_status`, `error_message = p_error`) |
 | `nb_sla_watch` | `p_load_date` (trống ⇒ hôm qua giờ VN) | ghi DQ-OPS-01; `{"late_sources": [{"source_id", "owner", "support_channel"}]}` |
 | `nb_maintenance` | không | ghi `run_log` (`layer = maint`); `{"optimized": [...], "vacuumed": [...]}` |
