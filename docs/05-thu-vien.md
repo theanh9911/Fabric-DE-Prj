@@ -62,6 +62,7 @@ ORDER_STATUS = {"PENDING": "Pending", "PENDNG": "Pending", "CONFIRMED": "Confirm
 STATUS_RANK = {"Pending": 1, "Confirmed": 2, "Shipped": 3, "Delivered": 4, "Returned": 5, "Cancelled": 6}
 TAX_WORDS = {"FIVEPERCENT": "0.05"}
 GENDER = {"F": "Female", "FEMALE": "Female", "M": "Male", "MALE": "Male", "MAEL": "Male", "UNKNOWN": "Unknown",
+          "X": "Unknown"}
 POSITION = {"SALESMAN": "Salesman", "SALE": "Salesman", "SALSEMAN": "Salesman", "TEAMLEAD": "Team Lead",
             "MANAGER": "Manager", "DIRECTOR": "Director"}
 BRAND = {"IKEA": "IKEA", "APPLE": "Apple", "ZARA": "Zara", "UNIQLO": "Uniqlo", "HP": "HP", "LENOVO": "Lenovo",
