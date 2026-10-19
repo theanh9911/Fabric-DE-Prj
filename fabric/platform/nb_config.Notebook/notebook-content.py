@@ -55,7 +55,7 @@ ORDER_STATUS = {"PENDING": "Pending", "PENDNG": "Pending", "CONFIRMED": "Confirm
                 "RETURNED": "Returned", "RETURN": "Returned", "CANCELLED": "Cancelled", "CANCEL": "Cancelled"}
 STATUS_RANK = {"Pending": 1, "Confirmed": 2, "Shipped": 3, "Delivered": 4, "Returned": 5, "Cancelled": 6}
 TAX_WORDS = {"FIVEPERCENT": "0.05"}
-GENDER = {"F": "Female", "FEMALE": "Female", "M": "Male", "MALE": "Male", "MAEL": "Male", "UNKNOWN": "Unknown"}
+GENDER = {"F": "Female", "FEMALE": "Female", "M": "Male", "MALE": "Male", "MAEL": "Male", "UNKNOWN": "Unknown",
 POSITION = {"SALESMAN": "Salesman", "SALE": "Salesman", "SALSEMAN": "Salesman", "TEAMLEAD": "Team Lead",
             "MANAGER": "Manager", "DIRECTOR": "Director"}
 BRAND = {"IKEA": "IKEA", "APPLE": "Apple", "ZARA": "Zara", "UNIQLO": "Uniqlo", "HP": "HP", "LENOVO": "Lenovo",
@@ -103,7 +103,7 @@ SILVER = [
                   reject_reason="invalid_updated_at"),
          ]),
     dict(table="slv.customers_history", entity="customers", kind="snapshot", notebook="nb_slv_master",
-         logic_version=1, is_active=True,
+         logic_version=2, is_active=True,
          business_keys=["customer_code"],
          hash_exclude=_HISTORY_TECH_HASH_EXCLUDE + ["gender_raw"],
          columns=[

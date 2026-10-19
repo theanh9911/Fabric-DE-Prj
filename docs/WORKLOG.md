@@ -211,3 +211,9 @@ Rà code theo đường đi của lượt `rerun` + `p_full_reload` trước khi
 - `quarantine_rows` chỉ chèn thêm: dựng lại hoàn toàn sẽ nhân đôi dòng REJECT của delivery đã có dòng cũ (Dev còn dòng do code trước D1) và RC-03 FAIL; đổi logic rồi dựng lại cũng để lại dòng cũ sai. Nay `quarantine_rows(..., replace=True)` (Silver orders/master khi `full`) xoá dòng cũ của các delivery được dựng lại rồi chèn dòng tính lại; đóng thủ công của các delivery đó mất.
 Sửa: nb_common, nb_slv_orders, nb_slv_master, nb_test_unit (thêm bước replace vào test quarantine). Tài liệu: 04 §7.2, §13; 05 §4.8, §4.13.
 Kiểm chứng Fabric: chưa kiểm chứng. Cần Update all, `nb_test_unit`, rồi lượt dựng lại (`rerun`, `p_full_reload=true`, ngày để trống): kỳ vọng recon RC-01..05 đầy đủ, RC-03 PASS, `slv.quarantine` không còn dòng trùng.
+## 2026-10-19 — Gender X về Unknown (chưa kiểm chứng Fabric) — REVIEW
+Người/agent: Claude (Sonnet 5.5)   Nhánh: dev
+Đã làm: thêm `"X": "Unknown"` vào `GENDER` (`nb_config`, docs/05 §2.2); tăng `logic_version` của `slv.customers_history` lên 2 (W8) để Silver dựng lại; quyết định D45; cập nhật EDA E13. `gender_raw` vẫn giữ `X`. Đính chính mục 2026-10-18: `X` không còn FLAG `unmapped_value`.
+Lý do: `dim_customer.gender` hiện `X` cạnh `Unknown`, DA kéo lên chart thấy 4 nhóm. Chọn phương án tối thiểu theo yêu cầu của người dùng; bảng ánh xạ có người duyệt chưa làm.
+File: nb_config. Tài liệu: 05 §2.2, DECISIONS (D40, D45), EDA E13.
+Kiểm chứng Fabric: chưa kiểm chứng. Chạy `pl_master_daily` (`normal`, `p_load_date = 2025-12-31`): `slv.customers_history` kỳ vọng `RUN full logic_version`, `gld.dim_customer` kỳ vọng `RUN incremental input_changed`; sau đó `gender` ở `dim_customer` chỉ còn Female, Male, Unknown. `nb_recon` thấy Silver dựng lại nên đối soát lại mọi delivery.
